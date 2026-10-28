@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>מפת שוק הכרמל</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="mapPage">
+
+<section id="loginView" class="login card hidden">
+  <h2>מפת שוק הכרמל</h2>
+  <p class="muted">הכניסה בקוד האישי.</p>
+  <input id="loginCode" type="password" placeholder="קוד אישי">
+  <div class="actions"><button id="loginBtn" class="btn primary block">כניסה</button></div>
+  <div id="loginErr" class="err"></div>
+</section>
+
+<header class="top hidden" id="topBar">
+  <h1>מפת שוק הכרמל</h1>
+  <span id="stats" class="badge"></span>
+  <a href="index.html">לטופס</a>
+</header>
+
+<div id="mapWrap" class="hidden">
+  <div id="map"></div>
+  <aside class="side">
+    <div class="legend">
+      <span><i class="dot" style="background:var(--none)"></i>לא נסקר</span>
+      <span><i class="dot" style="background:var(--ok)"></i>מולא</span>
+      <span><i class="dot" style="background:var(--warn)"></i>יש להשלים</span>
+      <span><i class="dot" style="background:#2b6cb0"></i>צומת</span>
+    </div>
+    <label class="f" for="fType">סוג עסק</label>
+    <select id="fType"><option value="">הכול</option></select>
+    <label class="f" for="fLinked">מקושר ל-</label>
+    <select id="fLinked"><option value="">הכול</option></select>
+    <label class="f" for="fStructure">סוג מבנה</label>
+    <select id="fStructure"><option value="">הכול</option></select>
+    <div class="actions">
+      <button id="xlsxBtn" class="btn primary small">ייצוא לאקסל</button>
+      <button id="jsonBtn" class="btn ghost small">ייצוא JSON</button>
+      <button id="reloadBtn" class="btn ghost small">רענון</button>
+    </div>
+    <h3 style="margin-top:16px">לפי כתובת</h3>
+    <div id="addrTable"></div>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/map.js"></script>
+</body>
+</html>

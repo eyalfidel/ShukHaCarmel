@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>מיפוי שוק הכרמל</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<!-- כניסה -->
+<section id="loginView" class="login card hidden">
+  <h2>מיפוי שוק הכרמל</h2>
+  <p class="muted">הכניסה בקוד האישי שקיבלת.</p>
+  <input id="loginCode" type="password" autocomplete="current-password" placeholder="קוד אישי">
+  <div class="actions"><button id="loginBtn" class="btn primary block">כניסה</button></div>
+  <div id="loginErr" class="err"></div>
+</section>
+
+<div id="appView" class="hidden">
+  <header class="top">
+    <h1>מיפוי שוק הכרמל</h1>
+    <span id="queueBadge" class="badge hidden"></span>
+    <span id="userBadge" class="badge"></span>
+    <a href="map.html">מפה</a>
+  </header>
+  <nav class="tabs">
+    <button data-tab="report" class="active">דיווח</button>
+    <button data-tab="pending">להשלים <span id="pendingCount"></span></button>
+    <button data-tab="junction">צומת</button>
+  </nav>
+
+  <main>
+    <!-- דיווח -->
+    <section id="tab-report">
+      <div class="card">
+        <h2>כתובת</h2>
+        <div class="row2">
+          <div>
+            <label class="f" for="street">רחוב</label>
+            <input id="street" type="text" list="streetList" value="הכרמל" autocomplete="off">
+          </div>
+          <div>
+            <label class="f" for="house">מספר</label>
+            <select id="house"></select>
+          </div>
+        </div>
+        <div id="addrInfo" class="muted" style="margin-top:8px"></div>
+        <div id="existingAtAddr"></div>
+      </div>
+
+      <div id="bizList"></div>
+
+      <div class="actions">
+        <button id="addBiz" class="btn ghost">+ עסק נוסף</button>
+      </div>
+      <div class="actions">
+        <button id="submitVisit" class="btn primary block">שמירת הדיווח</button>
+      </div>
+      <div id="submitErr" class="err"></div>
+    </section>
+
+    <!-- להשלים -->
+    <section id="tab-pending" class="hidden">
+      <div class="card">
+        <div class="addr-head">
+          <h2>עסקים שסומנו "סגור – להשלים"</h2>
+          <button id="refreshBtn" class="btn ghost small">רענון</button>
+        </div>
+        <div id="pendingList" class="muted">טוען…</div>
+      </div>
+      <div id="editWrap"></div>
+    </section>
+
+    <!-- צומת -->
+    <section id="tab-junction" class="hidden">
+      <div class="card">
+        <h2>צמתים לאורך הכרמל</h2>
+        <p class="muted">רשימה שחושבה מראש מהמפה. כשמגיעים לצומת - "אישור" רושם אותו. אם משהו לא נכון, מוסיפים צומת ידנית למטה.</p>
+        <div id="juncList"></div>
+      </div>
+      <div class="card">
+        <h3>הוספת צומת ידנית</h3>
+        <label class="f" for="jCross">רחוב חוצה</label>
+        <input id="jCross" type="text" list="streetList" autocomplete="off">
+        <label class="f">צד</label>
+        <div class="chips" id="jSide">
+          <label><input type="radio" name="jside" value="אי-זוגי">אי-זוגי</label>
+          <label><input type="radio" name="jside" value="זוגי">זוגי</label>
+          <label><input type="radio" name="jside" value="שני הצדדים">שני הצדדים</label>
+        </div>
+        <div class="row2">
+          <div><label class="f" for="jFrom">בין מספר</label><select id="jFrom"></select></div>
+          <div><label class="f" for="jTo">לבין מספר</label><select id="jTo"></select></div>
+        </div>
+        <label class="f" for="jNote">הערה</label>
+        <input id="jNote" type="text">
+        <div class="actions"><button id="jAdd" class="btn primary block">הוספת צומת</button></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="actions" style="justify-content:center;padding-bottom:24px">
+    <button id="logoutBtn" class="btn ghost small">יציאה</button>
+  </div>
+</div>
+
+<datalist id="streetList"></datalist>
+<datalist id="linkedList"></datalist>
+
+<template id="bizTpl">
+  <div class="card biz">
+    <div class="addr-head">
+      <h3 class="biz-title">עסק</h3>
+      <button class="btn ghost small rm">הסרה</button>
+    </div>
+    <label class="f">סוג המבנה</label>
+    <div class="chips" data-field="structure"></div>
+    <label class="toggle"><input type="checkbox" data-field="closed"> סגור – יושלם בהמשך</label>
+    <div class="open-only">
+      <div class="row2">
+        <div><label class="f">שם פרטי</label><input type="text" data-field="first_name" autocomplete="off"></div>
+        <div><label class="f">שם משפחה</label><input type="text" data-field="last_name" autocomplete="off"></div>
+      </div>
+      <label class="f">טלפון</label>
+      <input type="tel" data-field="phone" inputmode="tel" autocomplete="off">
+      <label class="f">שם העסק</label>
+      <input type="text" data-field="business_name" autocomplete="off">
+      <label class="f">סוג העסק</label>
+      <div class="chips" data-field="business_type"></div>
+      <label class="f">שוכר או בעלים</label>
+      <div class="chips" data-field="tenure"></div>
+      <label class="f">מקושר ל-</label>
+      <input type="text" data-field="linked_to" list="linkedList" autocomplete="off">
+      <label class="f">תמונה</label>
+      <input type="file" accept="image/*" capture="environment" data-field="photo">
+      <img class="photo-prev hidden" alt="">
+    </div>
+    <label class="f">הערה</label>
+    <textarea data-field="note"></textarea>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

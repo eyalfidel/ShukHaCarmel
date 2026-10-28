@@ -1,0 +1,130 @@
+[
+ {
+  "street": "הכרמל",
+  "cross_street": "יצחק אלחנן",
+  "lat": 32.065824,
+  "lng": 34.765309,
+  "even_side": true,
+  "even_between": [
+   null,
+   "2"
+  ],
+  "odd_side": false,
+  "odd_between": [
+   null,
+   "11א"
+  ]
+ },
+ {
+  "street": "הכרמל",
+  "cross_street": "לפין",
+  "lat": 32.066181,
+  "lng": 34.76575,
+  "even_side": true,
+  "even_between": [
+   "10",
+   "12"
+  ],
+  "odd_side": false,
+  "odd_between": [
+   null,
+   "11א"
+  ]
+ },
+ {
+  "street": "הכרמל",
+  "cross_street": "יעבץ",
+  "lat": 32.066668,
+  "lng": 34.766354,
+  "even_side": true,
+  "even_between": [
+   "14",
+   "16"
+  ],
+  "odd_side": false,
+  "odd_between": [
+   null,
+   "11א"
+  ]
+ },
+ {
+  "street": "הכרמל",
+  "cross_street": "קלישר",
+  "lat": 32.067231,
+  "lng": 34.767051,
+  "even_side": true,
+  "even_between": [
+   "22",
+   "24"
+  ],
+  "odd_side": false,
+  "odd_between": [
+   null,
+   "11א"
+  ]
+ },
+ {
+  "street": "הכרמל",
+  "cross_street": "שפ\"ר",
+  "lat": 32.068039,
+  "lng": 34.76805,
+  "even_side": true,
+  "even_between": [
+   "38",
+   "40"
+  ],
+  "odd_side": false,
+  "odd_between": [
+   "9",
+   "13"
+  ]
+ },
+ {
+  "street": "הכרמל",
+  "cross_street": "רמב\"ם",
+  "lat": 32.068368,
+  "lng": 34.768458,
+  "even_side": true,
+  "even_between": [
+   "42",
+   "44"
+  ],
+  "odd_side": false,
+  "odd_between": [
+   "11",
+   "17"
+  ]
+ },
+ {
+  "street": "הכרמל",
+  "cross_street": "שינקין",
+  "lat": 32.069944,
+  "lng": 34.770409,
+  "even_side": true,
+  "even_between": [
+   "58",
+   null
+  ],
+  "odd_side": false,
+  "odd_between": [
+   "43",
+   null
+  ]
+ },
+ {
+  "street": "הכרמל",
+  "cross_street": "המלך ג'ורג'",
+  "lat": 32.069944,
+  "lng": 34.770409,
+  "even_side": true,
+  "even_between": [
+   "58",
+   null
+  ],
+  "odd_side": false,
+  "odd_between": [
+   "43",
+   null
+  ]
+ }
+]
