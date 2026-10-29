@@ -126,12 +126,14 @@
   chips('structure', S.STRUCTURES);
   chips('business_type', S.BUSINESS_TYPES);
   chips('tenure', S.TENURES);
+  chips('shuttle', S.YES_NO);
+  $('commuteList').innerHTML = S.COMMUTE_SUGGESTIONS.map(function (c) { return '<option value="' + S.esc(c) + '">'; }).join('');
 
   function getRadio(k) { var r = field(k).querySelector('input:checked'); return r ? r.value : ''; }
   function setRadio(k, v) { field(k).querySelectorAll('input').forEach(function (r) { r.checked = r.value === v; }); }
 
-  var TEXT_FIELDS = ['first_name', 'last_name', 'phone', 'business_name', 'business_type_other', 'street', 'house', 'stall', 'linked_to', 'note'];
-  var RADIO_FIELDS = ['structure', 'business_type', 'tenure'];
+  var TEXT_FIELDS = ['first_name', 'last_name', 'phone', 'home_city', 'commute', 'business_name', 'business_type_other', 'street', 'house', 'stall', 'linked_to', 'note'];
+  var RADIO_FIELDS = ['structure', 'business_type', 'tenure', 'shuttle'];
   var OTHER = 'אחר';
 
   // ---------- הגדרות חובה / רשות / לא מוצג ----------

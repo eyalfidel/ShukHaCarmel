@@ -63,9 +63,26 @@
             <input id="f_phone" type="tel" data-field="phone" inputmode="tel" autocomplete="off">
           </div>
 
+          <div class="fld" data-key="home_city">
+            <label class="f" for="f_city">מאיפה הסוחר</label>
+            <input id="f_city" type="text" data-field="home_city" autocomplete="off" placeholder="עיר / שכונה">
+          </div>
+          <div class="fld" data-key="commute">
+            <label class="f" for="f_commute">איך מגיע לשוק</label>
+            <input id="f_commute" type="text" data-field="commute" list="commuteList" autocomplete="off" placeholder="למשל: אוטובוס, רכב פרטי">
+          </div>
+          <div class="fld" data-key="shuttle">
+            <label class="f">אם היה שאטל, היה משתמש בו?</label>
+            <div class="chips" data-field="shuttle"></div>
+          </div>
+
           <div class="fld" data-key="business_name">
             <label class="f" for="f_name">שם העסק</label>
             <input id="f_name" type="text" data-field="business_name" autocomplete="off">
+          </div>
+          <div class="fld" data-key="linked_to">
+            <label class="f" for="f_linked">מקושר ל-</label>
+            <input id="f_linked" type="text" data-field="linked_to" list="linkedList" autocomplete="off">
           </div>
           <div class="fld" data-key="business_type">
             <label class="f">סוג העסק</label>
@@ -90,11 +107,6 @@
           <div class="fld" data-key="stall">
             <label class="f" for="f_stall">תיאור מיקום (טקסט חופשי)</label>
             <input id="f_stall" type="text" data-field="stall" autocomplete="off" placeholder="למשל: הבסטה השלישית מהפינה עם רמב&quot;ם">
-          </div>
-
-          <div class="fld" data-key="linked_to">
-            <label class="f" for="f_linked">מקושר ל-</label>
-            <input id="f_linked" type="text" data-field="linked_to" list="linkedList" autocomplete="off">
           </div>
 
           <div class="fld" data-key="note">
@@ -158,6 +170,7 @@
 
 <datalist id="streetList"></datalist>
 <datalist id="linkedList"></datalist>
+<datalist id="commuteList"></datalist>
 
 <script src="config.js"></script>
 <script src="assets/common.js"></script>

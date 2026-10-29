@@ -9,6 +9,9 @@
   var BUSINESS_TYPES = ['הסעדה', 'מזון', 'מסחר', 'אחר'];
   var STRUCTURES = ['בסטה', 'חנות'];
   var TENURES = ['שוכר', 'בעלים', 'לא יודע כרגע'];
+  var YES_NO = ['כן', 'לא'];
+  // הצעות בלבד - אפשר להקליד כל דבר
+  var COMMUTE_SUGGESTIONS = ['רכב פרטי', 'אוטובוס', 'רכבת', 'רכבת קלה', 'אופניים / קורקינט', 'אופנוע / קטנוע', 'מונית', 'ברגל', 'הסעה'];
   var STATUS_LABEL = { filled: 'מולא', closed: 'ריק – להשלים' };
 
   // שדות הטופס לפי הסדר, וברירת המחדל לכל סוג טופס:
@@ -19,14 +22,17 @@
     { key: 'first_name', label: 'שם פרטי', full: 'req', empty: 'hide' },
     { key: 'last_name', label: 'שם משפחה', full: 'req', empty: 'hide' },
     { key: 'phone', label: 'טלפון', full: 'req', empty: 'hide' },
+    { key: 'home_city', label: 'מאיפה הסוחר', full: 'opt', empty: 'hide' },
+    { key: 'commute', label: 'איך מגיע לשוק', full: 'opt', empty: 'hide' },
+    { key: 'shuttle', label: 'היה משתמש בשאטל?', full: 'opt', empty: 'hide' },
     { key: 'business_name', label: 'שם העסק', full: 'req', empty: 'opt' },
+    { key: 'linked_to', label: 'מקושר ל-', full: 'opt', empty: 'hide' },
     { key: 'business_type', label: 'סוג העסק', full: 'req', empty: 'opt' },
     { key: 'business_type_other', label: 'פירוט סוג "אחר"', full: 'req', empty: 'opt', note: 'מופיע ונבדק רק כשנבחר "אחר"' },
     { key: 'tenure', label: 'שוכר או בעלים', full: 'req', empty: 'hide' },
     { key: 'street', label: 'רחוב', full: 'req', empty: 'req' },
     { key: 'house', label: 'מספר', full: 'req', empty: 'req' },
     { key: 'stall', label: 'תיאור מיקום', full: 'opt', empty: 'opt' },
-    { key: 'linked_to', label: 'מקושר ל-', full: 'opt', empty: 'hide' },
     { key: 'note', label: 'הערה', full: 'opt', empty: 'opt' },
     { key: 'photo', label: 'תמונה', full: 'req', empty: 'req' }
   ];
@@ -342,6 +348,7 @@
     getCode: getCode, getUser: getUser, login: login, logout: logout,
     enqueue: enqueue, flush: flush, queueList: queueList, onQueueChange: onQueueChange, dropQueued: dropQueued,
     lastError: function () { return lastError; },
+    YES_NO: YES_NO, COMMUTE_SUGGESTIONS: COMMUTE_SUGGESTIONS,
     FORMS: FORMS, FIELDS: FIELDS, MODES: MODES, getSettings: getSettings, cacheSettings: cacheSettings,
     isAdmin: isAdmin, setAdmin: setAdmin, loadPhoto: loadPhoto,
     CENTER: CFG.CENTER || [32.0678, 34.7678],

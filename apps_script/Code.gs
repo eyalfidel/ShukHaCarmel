@@ -49,7 +49,11 @@ var BUSINESS_COLS = [
   ['updated_by', 'עודכן ע"י'],
   ['updated_at', 'עודכן'],
   ['client_id', 'client_id'],
-  ['business_type_other', 'פירוט סוג אחר']   // נוסף בסוף, כדי לא להזיז עמודות קיימות
+  // עמודות שנוספו בהמשך - תמיד בסוף, כדי לא להזיז עמודות קיימות
+  ['business_type_other', 'פירוט סוג אחר'],
+  ['home_city', 'מאיפה הסוחר'],
+  ['commute', 'איך מגיע'],
+  ['shuttle', 'שאטל']
 ];
 
 var JUNCTION_COLS = [
@@ -65,7 +69,7 @@ var JUNCTION_COLS = [
 ];
 
 // שדות שהלקוח רשאי לכתוב בעסק (השאר נקבעים בשרת)
-var BUSINESS_WRITABLE = ['business_type_other', 'street', 'house', 'side', 'area', 'stall', 'loc_lat', 'loc_lng', 'status', 'first_name', 'last_name', 'phone',
+var BUSINESS_WRITABLE = ['business_type_other', 'home_city', 'commute', 'shuttle', 'street', 'house', 'side', 'area', 'stall', 'loc_lat', 'loc_lng', 'status', 'first_name', 'last_name', 'phone',
   'business_name', 'business_type', 'structure', 'tenure', 'linked_to', 'note',
   'gps_open_lat', 'gps_open_lng', 'gps_open_acc', 'gps_close_lat', 'gps_close_lng', 'gps_close_acc'];
 
