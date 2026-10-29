@@ -72,7 +72,8 @@
   function bizLine(b) {
     var who = [b.first_name, b.last_name].filter(Boolean).join(' ');
     var s = [b.structure, b.business_name || b.business_type, who ? 'של ' + who : ''].filter(Boolean).join(' – ');
-    if (b.status === 'closed') s += ' (סגור – להשלים)';
+    if (b.status === 'closed') s += ' (ריק – להשלים)';
+    if (b.stall) s += ' · ' + b.stall;
     return S.esc(s) + (b.photo_url && /^https?:/.test(b.photo_url) ? ' <a href="' + S.esc(b.photo_url) + '" target="_blank" rel="noopener">📷</a>' : '');
   }
 
@@ -80,12 +81,19 @@
     layer.clearLayers();
     var anyFilter = $('fType').value || $('fLinked').value || $('fStructure').value;
     var biz = filtered();
-    var byAddr = {};
-    biz.forEach(function (b) {
-      if (b.street) (byAddr[key(b.street, String(b.house))] = byAddr[key(b.street, String(b.house))] || []).push(b);
-    });
     var addrIndex = {};
     addresses.forEach(function (a) { addrIndex[key(a.street, a.house)] = a; });
+    // עסק שהכתובת שלו ברשימה - על נקודת הכתובת. אחרת - לפי ה-GPS מפתיחת הטופס
+    var byAddr = {}, byPoint = {};
+    biz.forEach(function (b) {
+      var k = key(b.street, String(b.house));
+      if (b.street && addrIndex[k]) { (byAddr[k] = byAddr[k] || []).push(b); return; }
+      var lat = +(b.gps_open_lat || b.gps_close_lat || b.loc_lat), lng = +(b.gps_open_lng || b.gps_close_lng || b.loc_lng);
+      b._noPoint = !(lat && lng);
+      if (b._noPoint) return;
+      var pk = lat.toFixed(5) + ',' + lng.toFixed(5);
+      (byPoint[pk] = byPoint[pk] || []).push(b);
+    });
 
     // נקודות: כל כתובות הכרמל + כל כתובת אחרת שיש בה דיווח
     var shown = addresses.filter(function (a) { return a.street === MAIN_STREET || byAddr[key(a.street, a.house)]; });
@@ -103,21 +111,15 @@
     });
     if (!map._fitted && bounds.length) { map.fitBounds(bounds, { padding: [20, 20] }); map._fitted = true; }
 
-    // עסקים באזורים בלי כתובת (השוק המערבי, שוק הבשר...) - לפי הנקודה שסומנה
-    var byPoint = {};
-    biz.forEach(function (b) {
-      if (b.street || !b.loc_lat) return;
-      var k = (+b.loc_lat).toFixed(5) + ',' + (+b.loc_lng).toFixed(5);
-      (byPoint[k] = byPoint[k] || []).push(b);
-    });
+    // עסקים בלי כתובת מהרשימה - ריבוע לפי ה-GPS
     Object.keys(byPoint).forEach(function (k) {
       var list = byPoint[k], ll = k.split(',').map(Number);
       var color = list.some(function (b) { return b.status === 'closed'; }) ? COLORS.warn : COLORS.ok;
       L.marker(ll, { icon: L.divIcon({ className: '', iconSize: [14, 14],
         html: '<div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #fff;background:' + color + '"></div>' }) })
         .bindTooltip(S.esc(S.placeLabel(list[0])), { direction: 'top' })
-        .bindPopup('<b>' + S.esc(list[0].area || '') + '</b><ul>' + list.map(function (b) {
-          return '<li>' + (b.stall ? S.esc(b.stall) + ': ' : '') + bizLine(b) + '</li>';
+        .bindPopup('<b>לפי GPS</b><ul>' + list.map(function (b) {
+          return '<li>' + S.esc([b.street, b.house].filter(Boolean).join(' ')) + ' ' + bizLine(b) + '</li>';
         }).join('') + '</ul>')
         .addTo(layer);
     });
@@ -143,9 +145,16 @@
     });
 
     // טבלה צדדית
+    Object.keys(byPoint).forEach(function (pk) {
+      byPoint[pk].forEach(function (b) {
+        var k = (b.street || '~') + '|' + (b.house || '');
+        b._ll = pk;
+        (byAddr[k] = byAddr[k] || []).push(b);
+      });
+    });
     biz.forEach(function (b) {
-      if (b.street) return;
-      var k = (b.area || '') + '|' + (b.stall || '');
+      if (!b._noPoint) return;
+      var k = (b.street || '~') + '|' + (b.house || '');
       (byAddr[k] = byAddr[k] || []).push(b);
     });
     var keys = Object.keys(byAddr).sort(function (x, y) {
@@ -154,9 +163,9 @@
     });
     $('addrTable').innerHTML = keys.length ? '<table class="biz">' + keys.map(function (k) {
       var p = k.split('|'), a = addrIndex[k], first = byAddr[k][0];
-      var ll = a ? a.lat + ',' + a.lng : (!first.street && first.loc_lat ? first.loc_lat + ',' + first.loc_lng : '');
+      var ll = a ? a.lat + ',' + a.lng : (first._ll || '');
       return '<tr><th' + (ll ? ' data-ll="' + ll + '" style="cursor:pointer;text-decoration:underline"' : '') + '>' +
-        S.esc(first.street ? p[0] + ' ' + p[1] : S.placeLabel(first)) + '</th><td>' +
+        S.esc(first.street ? [p[0], p[1]].join(' ') : 'בלי רחוב') + '</th><td>' +
         byAddr[k].map(bizLine).join('<br>') + '</td></tr>';
     }).join('') + '</table>' : '<p class="muted">אין דיווחים' + (anyFilter ? ' שמתאימים לסינון' : '') + '.</p>';
     $('addrTable').querySelectorAll('[data-ll]').forEach(function (th) {
@@ -213,8 +222,7 @@
   // ---------- ייצוא ----------
 
   var BIZ_COLS = [
-    ['area', 'אזור'], ['street', 'רחוב'], ['house', 'מספר'], ['side', 'צד'], ['stall', 'תיאור מיקום / דוכן'],
-    ['loc_lat', 'מיקום lat'], ['loc_lng', 'מיקום lng'], ['status', 'סטטוס'],
+    ['street', 'רחוב'], ['house', 'מספר'], ['side', 'צד'], ['stall', 'תיאור מיקום'], ['status', 'סטטוס'],
     ['structure', 'סוג המבנה'], ['business_name', 'שם העסק'], ['business_type', 'סוג העסק'],
     ['first_name', 'שם פרטי'], ['last_name', 'שם משפחה'], ['phone', 'טלפון'], ['tenure', 'שוכר/בעלים'],
     ['linked_to', 'מקושר ל-'], ['note', 'הערה'], ['photo_url', 'תמונה'],
@@ -237,8 +245,7 @@
 
   function sortedBiz() {
     return filtered().slice().sort(function (x, y) {
-      return String(x.area || '').localeCompare(y.area || '', 'he') ||
-        (x.street !== MAIN_STREET) - (y.street !== MAIN_STREET) || String(x.street).localeCompare(y.street, 'he') ||
+      return (x.street !== MAIN_STREET) - (y.street !== MAIN_STREET) || String(x.street).localeCompare(y.street, 'he') ||
         String(x.stall || '').localeCompare(y.stall || '', 'he') ||
         S.cmpHouse(String(x.house), String(y.house));
     });

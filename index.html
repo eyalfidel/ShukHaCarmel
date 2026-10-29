@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>מיפוי שוק הכרמל</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -33,55 +32,94 @@
   <main>
     <!-- דיווח -->
     <section id="tab-report">
-      <div class="card">
-        <h2>מיקום</h2>
-        <div class="chips" id="areaChips"></div>
-        <div id="streetBox">
-          <div class="row2">
-            <div>
-              <label class="f" for="street">רחוב</label>
-              <input id="street" type="text" list="streetList" value="הכרמל" autocomplete="off">
-            </div>
-            <div>
-              <label class="f" for="house">מספר</label>
-              <select id="house"></select>
-            </div>
+      <!-- מסך פתיחה -->
+      <div id="homeView">
+        <button class="btn primary block big" data-start="full">+ הוספת עסק חדש</button>
+        <p class="muted center">יש עם מי לדבר - ממלאים את כל הפרטים</p>
+        <button class="btn ghost block big" data-start="empty">+ הוספת עסק ריק</button>
+        <p class="muted center">העסק סגור עכשיו או סגור לגמרי - רק מבנה, כתובת ותמונה</p>
+      </div>
+
+      <!-- טופס עסק (חדש / ריק / השלמה) -->
+      <div id="formView" class="hidden">
+        <div class="card" id="bizForm">
+          <div class="addr-head">
+            <h2 id="formTitle">עסק חדש</h2>
+            <button id="cancelForm" class="btn ghost small">ביטול</button>
           </div>
-        </div>
-        <div id="placeBox" class="hidden">
-          <label class="f">נקודה על המפה (לחיצה על המפה מזיזה את הסיכה)</label>
-          <div id="placeMap"></div>
-          <div class="actions" style="margin-top:6px"><button id="useGps" class="btn ghost small">למיקום שלי</button></div>
-          <label class="f" for="stall">תיאור מיקום / מספר דוכן</label>
-          <input id="stall" type="text" autocomplete="off" placeholder="למשל: דוכן שלישי מהכניסה">
-        </div>
-        <div id="addrInfo" class="muted" style="margin-top:8px"></div>
-        <div id="existingAtAddr"></div>
-      </div>
 
-      <div id="bizList"></div>
+          <label class="f">בסטה או חנות</label>
+          <div class="chips" data-field="structure"></div>
 
-      <div class="actions">
-        <button id="addBiz" class="btn ghost">+ עסק נוסף</button>
+          <div class="full-only">
+            <div class="row2">
+              <div><label class="f" for="f_first">שם פרטי</label><input id="f_first" type="text" data-field="first_name" autocomplete="off"></div>
+              <div><label class="f" for="f_last">שם משפחה</label><input id="f_last" type="text" data-field="last_name" autocomplete="off"></div>
+            </div>
+            <label class="f" for="f_phone">טלפון</label>
+            <input id="f_phone" type="tel" data-field="phone" inputmode="tel" autocomplete="off">
+          </div>
+
+          <label class="f" for="f_name">שם העסק <span class="empty-only muted">(לא חובה)</span></label>
+          <input id="f_name" type="text" data-field="business_name" autocomplete="off">
+          <label class="f">סוג העסק <span class="empty-only muted">(לא חובה)</span></label>
+          <div class="chips" data-field="business_type"></div>
+
+          <div class="full-only">
+            <label class="f">שוכר או בעלים</label>
+            <div class="chips" data-field="tenure"></div>
+          </div>
+
+          <h3 class="section">כתובת</h3>
+          <div class="row2 addr">
+            <div><label class="f" for="f_street">רחוב</label><input id="f_street" type="text" data-field="street" list="streetList" autocomplete="off"></div>
+            <div><label class="f" for="f_house">מספר</label><input id="f_house" type="text" data-field="house" inputmode="numeric" autocomplete="off"></div>
+          </div>
+          <div id="sideInfo" class="muted"></div>
+          <label class="f" for="f_stall">תיאור מיקום (טקסט חופשי)</label>
+          <input id="f_stall" type="text" data-field="stall" autocomplete="off" placeholder="למשל: הבסטה השלישית מהפינה עם רמב&quot;ם">
+
+          <div class="full-only">
+            <label class="f" for="f_linked">מקושר ל-</label>
+            <input id="f_linked" type="text" data-field="linked_to" list="linkedList" autocomplete="off">
+          </div>
+
+          <label class="f" for="f_note">הערה</label>
+          <textarea id="f_note" data-field="note"></textarea>
+
+          <label class="f">תמונה</label>
+          <label class="camera" for="f_photo">
+            <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path fill="currentColor" d="M9 3 7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>
+            <span class="cam-text">צילום</span>
+          </label>
+          <input id="f_photo" type="file" accept="image/*" capture="environment" class="visually-hidden">
+          <img id="photoPrev" class="photo-prev hidden" alt="">
+          <div id="gpsInfo" class="muted" style="margin-top:10px"></div>
+          <div id="existingHere"></div>
+        </div>
+
+        <div id="saveActions" class="save-actions">
+          <button class="btn primary block" data-next="similar">שמור והמשך לעסק דומה<small>אותו רחוב ואותו "מקושר ל-"</small></button>
+          <button class="btn block" data-next="other">שמור והמשך לעסק אחר<small>טופס חדש ונקי</small></button>
+          <button class="btn ghost block" data-next="empty">שמור והמשך לעסק ריק<small>אותו רחוב</small></button>
+        </div>
+        <div id="completeActions" class="save-actions hidden">
+          <button class="btn primary block" data-complete="1">שמירת ההשלמה</button>
+        </div>
+        <div id="formErr" class="err"></div>
       </div>
-      <div class="actions">
-        <button id="submitVisit" class="btn primary block">שמירת הדיווח</button>
-      </div>
-      <div id="submitErr" class="err"></div>
     </section>
 
     <!-- להשלים -->
     <section id="tab-pending" class="hidden">
       <div class="card">
         <div class="addr-head">
-          <h2>עסקים שסומנו "סגור – להשלים"</h2>
+          <h2>עסקים ריקים להשלמה</h2>
           <button id="refreshBtn" class="btn ghost small">רענון</button>
         </div>
         <div id="pendingList" class="muted">טוען…</div>
       </div>
-      <div id="editWrap"></div>
     </section>
-
   </main>
 
   <div class="actions" style="justify-content:center;padding-bottom:24px">
@@ -92,40 +130,6 @@
 <datalist id="streetList"></datalist>
 <datalist id="linkedList"></datalist>
 
-<template id="bizTpl">
-  <div class="card biz">
-    <div class="addr-head">
-      <h3 class="biz-title">עסק</h3>
-      <button class="btn ghost small rm">הסרה</button>
-    </div>
-    <label class="f">סוג המבנה</label>
-    <div class="chips" data-field="structure"></div>
-    <label class="toggle"><input type="checkbox" data-field="closed"> סגור – יושלם בהמשך</label>
-    <div class="open-only">
-      <div class="row2">
-        <div><label class="f">שם פרטי</label><input type="text" data-field="first_name" autocomplete="off"></div>
-        <div><label class="f">שם משפחה</label><input type="text" data-field="last_name" autocomplete="off"></div>
-      </div>
-      <label class="f">טלפון</label>
-      <input type="tel" data-field="phone" inputmode="tel" autocomplete="off">
-      <label class="f">שם העסק</label>
-      <input type="text" data-field="business_name" autocomplete="off">
-      <label class="f">סוג העסק</label>
-      <div class="chips" data-field="business_type"></div>
-      <label class="f">שוכר או בעלים</label>
-      <div class="chips" data-field="tenure"></div>
-      <label class="f">מקושר ל-</label>
-      <input type="text" data-field="linked_to" list="linkedList" autocomplete="off">
-      <label class="f">תמונה</label>
-      <input type="file" accept="image/*" capture="environment" data-field="photo">
-      <img class="photo-prev hidden" alt="">
-    </div>
-    <label class="f">הערה</label>
-    <textarea data-field="note"></textarea>
-  </div>
-</template>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="config.js"></script>
 <script src="assets/common.js"></script>
 <script src="assets/app.js"></script>

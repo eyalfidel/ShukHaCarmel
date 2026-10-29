@@ -9,9 +9,7 @@
   var BUSINESS_TYPES = ['הסעדה', 'מזון', 'מסחר', 'אחר'];
   var STRUCTURES = ['בסטה', 'חנות'];
   var TENURES = ['שוכר', 'בעלים'];
-  var STATUS_LABEL = { filled: 'מולא', closed: 'סגור – להשלים' };
-  var STREET_AREA = 'רחוב';
-  var AREAS = CFG.AREAS || [];
+  var STATUS_LABEL = { filled: 'מולא', closed: 'ריק – להשלים' };
 
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } }
@@ -238,22 +236,28 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
-  // "הכרמל 45" או "שוק הבשר · דוכן 3"
+  // "הכרמל 45 · הבסטה השלישית" / רק תיאור חופשי
   function placeLabel(b) {
-    if (b.street) return b.street + ' ' + b.house;
-    return (b.area || '') + (b.stall ? ' · ' + b.stall : '');
+    var a = [b.street, b.house].filter(function (x) { return x !== '' && x != null; }).join(' ');
+    return (a + (b.stall ? (a ? ' · ' : '') + b.stall : '')) || 'בלי כתובת';
   }
   function distM(lat1, lng1, lat2, lng2) {
     var dy = (lat2 - lat1) * 111320, dx = (lng2 - lng1) * 111320 * Math.cos(lat1 * Math.PI / 180);
     return Math.sqrt(dx * dx + dy * dy);
   }
+  // רקע: צילום אוויר של Esri + תוויות רחובות, ומעליהם צילום מסך מה-GIS העירוני (CFG.ORTHO)
   function baseLayers(map) {
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 21, maxNativeZoom: 19, attribution: 'Esri'
     }).addTo(map);
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+    var overlays = {};
+    if (CFG.ORTHO) {
+      overlays['צילום עירוני'] = L.imageOverlay(CFG.ORTHO.url, CFG.ORTHO.bounds, { attribution: 'עיריית תל אביב-יפו' }).addTo(map);
+    }
+    overlays['שמות רחובות'] = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 21, maxNativeZoom: 19, opacity: .7
     }).addTo(map);
+    L.control.layers(null, overlays, { position: 'topleft', collapsed: true }).addTo(map);
   }
   function loadJSON(path) { return fetch(path).then(function (r) { return r.json(); }); }
 
@@ -263,7 +267,7 @@
     getCode: getCode, getUser: getUser, login: login, logout: logout,
     enqueue: enqueue, flush: flush, queueList: queueList, onQueueChange: onQueueChange, dropQueued: dropQueued,
     lastError: function () { return lastError; },
-    STREET_AREA: STREET_AREA, AREAS: AREAS, CENTER: CFG.CENTER || [32.0678, 34.7678],
+    CENTER: CFG.CENTER || [32.0678, 34.7678],
     placeLabel: placeLabel, distM: distM, baseLayers: baseLayers,
     gps: gps, resizeImage: resizeImage, uid: uid, cmpHouse: cmpHouse, esc: esc, loadJSON: loadJSON
   };
