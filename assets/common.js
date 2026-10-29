@@ -11,6 +11,44 @@
   var TENURES = ['שוכר', 'בעלים'];
   var STATUS_LABEL = { filled: 'מולא', closed: 'ריק – להשלים' };
 
+  // שדות הטופס לפי הסדר, וברירת המחדל לכל סוג טופס:
+  // req = חובה, opt = רשות, hide = לא מוצג. אפשר לשנות בעמוד ההגדרות (settings.html).
+  var FORMS = { full: 'עסק חדש', empty: 'עסק ריק' };
+  var FIELDS = [
+    { key: 'structure', label: 'בסטה או חנות', full: 'req', empty: 'req' },
+    { key: 'first_name', label: 'שם פרטי', full: 'opt', empty: 'hide' },
+    { key: 'last_name', label: 'שם משפחה', full: 'opt', empty: 'hide' },
+    { key: 'phone', label: 'טלפון', full: 'opt', empty: 'hide' },
+    { key: 'business_name', label: 'שם העסק', full: 'opt', empty: 'opt' },
+    { key: 'business_type', label: 'סוג העסק', full: 'opt', empty: 'opt' },
+    { key: 'business_type_other', label: 'פירוט סוג "אחר"', full: 'req', empty: 'opt', note: 'מופיע ונבדק רק כשנבחר "אחר"' },
+    { key: 'tenure', label: 'שוכר או בעלים', full: 'opt', empty: 'hide' },
+    { key: 'street', label: 'רחוב', full: 'req', empty: 'req' },
+    { key: 'house', label: 'מספר', full: 'opt', empty: 'opt' },
+    { key: 'stall', label: 'תיאור מיקום', full: 'opt', empty: 'opt' },
+    { key: 'linked_to', label: 'מקושר ל-', full: 'opt', empty: 'hide' },
+    { key: 'note', label: 'הערה', full: 'opt', empty: 'opt' },
+    { key: 'photo', label: 'תמונה', full: 'opt', empty: 'opt' }
+  ];
+  var MODES = { req: 'חובה', opt: 'רשות', hide: 'לא מוצג' };
+  var SETTINGS_KEY = 'shuk.settings';
+
+  // ההגדרות בפועל: ברירת המחדל, ומעליה מה שנשמר בשרת (נשמר גם במכשיר, לעבודה בלי רשת)
+  function getSettings() {
+    var saved = null;
+    try { saved = JSON.parse(lsGet(SETTINGS_KEY)); } catch (e) { }
+    var out = {};
+    Object.keys(FORMS).forEach(function (form) {
+      out[form] = {};
+      FIELDS.forEach(function (f) {
+        var v = saved && saved[form] && saved[form][f.key];
+        out[form][f.key] = MODES[v] ? v : f[form];
+      });
+    });
+    return out;
+  }
+  function cacheSettings(s) { if (s && typeof s === 'object') lsSet(SETTINGS_KEY, JSON.stringify(s)); }
+
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } }
 
@@ -57,6 +95,12 @@
     load: function () {
       try { return JSON.parse(lsGet('shuk.mockdb')) || { businesses: [], junctions: [] }; } catch (e) { return { businesses: [], junctions: [] }; }
     },
+    photo: function (dataUrl) {
+      var id = 'mock' + uid().replace(/-/g, '').slice(0, 12), all = {};
+      try { all = JSON.parse(lsGet('shuk.mockphotos')) || {}; } catch (e) { }
+      all[id] = dataUrl; lsSet('shuk.mockphotos', JSON.stringify(all));
+      return 'https://drive.google.com/file/d/' + id + '/view';
+    },
     save: function (db) { lsSet('shuk.mockdb', JSON.stringify(db)); },
     user: function (code) {
       if (!code) return { ok: false, error: 'AUTH' };
@@ -65,7 +109,12 @@
     get: function (p) {
       var bad = Mock.user(p.code); if (bad) return bad;
       var db = Mock.load();
-      return { ok: true, user: 'הדגמה (' + p.code + ')', businesses: db.businesses, junctions: db.junctions };
+      if (p.action === 'photo') {
+        var all = {};
+        try { all = JSON.parse(lsGet('shuk.mockphotos')) || {}; } catch (e) { }
+        return all[p.id] ? { ok: true, data: all[p.id] } : { ok: false, error: 'התמונה לא נמצאה' };
+      }
+      return { ok: true, user: 'הדגמה (' + p.code + ')', admin: true, settings: db.settings || null, businesses: db.businesses, junctions: db.junctions };
     },
     post: function (b) {
       var bad = Mock.user(b.code); if (bad) return bad;
@@ -79,7 +128,7 @@
           ['street', 'house', 'side', 'area', 'stall', 'loc_lat', 'loc_lng', 'gps_open_lat', 'gps_open_lng', 'gps_open_acc', 'gps_close_lat', 'gps_close_lng', 'gps_close_acc']
             .forEach(function (k) { if (rec[k] === undefined || rec[k] === '') rec[k] = b[k]; });
           rec.id = uid().slice(0, 8); rec.visit_id = visit;
-          rec.photo_url = x.photo ? '(תמונה בהדגמה)' : ''; delete rec.photo;
+          rec.photo_url = x.photo ? Mock.photo(x.photo) : ''; delete rec.photo;
           rec.created_by = who; rec.created_at = now;
           db.businesses.push(rec); ids.push(rec.id);
         });
@@ -90,7 +139,7 @@
         var r = db.businesses.filter(function (x) { return x.id === b.id; })[0];
         if (!r) return { ok: false, error: 'העסק לא נמצא' };
         var upd = Object.assign({}, b.business);
-        if (upd.photo) { r.photo_url = '(תמונה בהדגמה)'; }
+        if (upd.photo) { r.photo_url = Mock.photo(upd.photo); }
         delete upd.photo;
         Object.assign(r, upd, { updated_by: who, updated_at: now });
         Mock.save(db);
@@ -100,6 +149,10 @@
         var j = Object.assign({}, b.junction, { id: uid().slice(0, 8), created_by: who, created_at: now });
         db.junctions.push(j); Mock.save(db);
         return { ok: true, id: j.id };
+      }
+      if (b.action === 'saveSettings') {
+        db.settings = b.settings; Mock.save(db);
+        return { ok: true };
       }
       if (b.action === 'deleteJunction') {
         db.junctions = db.junctions.filter(function (x) { return x.id !== b.id; }); Mock.save(db);
@@ -113,14 +166,36 @@
 
   function getCode() { return lsGet(CODE_KEY); }
   function getUser() { return lsGet(USER_KEY); }
+  function isAdmin() { return lsGet('shuk.admin') === '1'; }
+  function setAdmin(v) { lsSet('shuk.admin', v ? '1' : null); }
   function login(code) {
     code = String(code || '').trim();
     return apiGet({ action: 'ping', code: code }).then(function (j) {
-      lsSet(CODE_KEY, code); lsSet(USER_KEY, j.user);
+      lsSet(CODE_KEY, code); lsSet(USER_KEY, j.user); setAdmin(j.admin);
       return j.user;
     });
   }
-  function logout() { lsSet(CODE_KEY, null); lsSet(USER_KEY, null); }
+  function logout() { lsSet(CODE_KEY, null); lsSet(USER_KEY, null); setAdmin(false); }
+
+  // ---------- תמונות מהדרייב (דרך השרת, רק עם קוד) ----------
+
+  function photoId(url) {
+    var m = /\/d\/([A-Za-z0-9_-]{10,})/.exec(url || '');
+    return m ? m[1] : null;
+  }
+  var photoCache = {};
+  function loadPhoto(url) {
+    var id = photoId(url);
+    if (!id) return Promise.reject(new Error('אין תמונה'));
+    if (!photoCache[id]) {
+      photoCache[id] = apiGet({ action: 'photo', id: id, code: getCode() }).then(function (j) {
+        if (!j.ok || !j.data) throw new Error(j.error || 'התמונה לא נטענה');
+        return j.data;
+      });
+      photoCache[id].catch(function () { delete photoCache[id]; });
+    }
+    return photoCache[id];
+  }
 
   // ---------- תור לא-מקוון (IndexedDB) ----------
 
@@ -267,6 +342,8 @@
     getCode: getCode, getUser: getUser, login: login, logout: logout,
     enqueue: enqueue, flush: flush, queueList: queueList, onQueueChange: onQueueChange, dropQueued: dropQueued,
     lastError: function () { return lastError; },
+    FORMS: FORMS, FIELDS: FIELDS, MODES: MODES, getSettings: getSettings, cacheSettings: cacheSettings,
+    isAdmin: isAdmin, setAdmin: setAdmin, loadPhoto: loadPhoto,
     CENTER: CFG.CENTER || [32.0678, 34.7678],
     placeLabel: placeLabel, distM: distM, baseLayers: baseLayers,
     gps: gps, resizeImage: resizeImage, uid: uid, cmpHouse: cmpHouse, esc: esc, loadJSON: loadJSON

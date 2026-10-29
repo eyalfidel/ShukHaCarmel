@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>הגדרות הטופס</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top">
+  <h1>הגדרות הטופס</h1>
+  <a href="index.html">לטופס</a>
+</header>
+<main>
+  <div class="card">
+    <p class="muted" style="margin-top:0">לכל שדה בכל סוג טופס: <b>חובה</b> (אי אפשר לשמור בלי), <b>רשות</b>, או <b>לא מוצג</b>. השינוי חל על כל הפעילים, מהרענון הבא של הטופס.</p>
+    <div id="msg" class="muted">טוען…</div>
+    <table class="settings hidden" id="tbl">
+      <thead><tr><th>שדה</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="actions hidden" id="acts">
+      <button id="saveBtn" class="btn primary">שמירה</button>
+      <button id="resetBtn" class="btn ghost">חזרה לברירת המחדל</button>
+    </div>
+    <div id="err" class="err"></div>
+  </div>
+</main>
+<script src="config.js"></script>
+<script src="assets/common.js"></script>
+<script src="assets/settings.js"></script>
+</body>
+</html>

@@ -33,6 +33,7 @@
     $('loginView').classList.add('hidden');
     $('appView').classList.remove('hidden');
     $('userBadge').textContent = S.getUser() + (S.isMock() ? ' · הדגמה' : '');
+    $('settingsLink').classList.toggle('hidden', !S.isAdmin());
     refresh();
     S.flush();
   }
@@ -87,6 +88,10 @@
     if (!S.getCode()) return Promise.resolve();
     return S.apiGet({ code: S.getCode() }).then(function (j) {
       state.server = { businesses: j.businesses || [], junctions: j.junctions || [] };
+      if (j.settings) S.cacheSettings(j.settings);
+      if ('admin' in j) S.setAdmin(j.admin);
+      $('settingsLink').classList.toggle('hidden', !S.isAdmin());
+      if (state.mode) applySettings();
       renderLinkedList(); renderPending(); renderExisting();
     }, function (e) {
       if (e.auth) { S.logout(); showLogin(); }
@@ -124,7 +129,66 @@
   function getRadio(k) { var r = field(k).querySelector('input:checked'); return r ? r.value : ''; }
   function setRadio(k, v) { field(k).querySelectorAll('input').forEach(function (r) { r.checked = r.value === v; }); }
 
-  var TEXT_FIELDS = ['first_name', 'last_name', 'phone', 'business_name', 'street', 'house', 'stall', 'linked_to', 'note'];
+  var TEXT_FIELDS = ['first_name', 'last_name', 'phone', 'business_name', 'business_type_other', 'street', 'house', 'stall', 'linked_to', 'note'];
+  var RADIO_FIELDS = ['structure', 'business_type', 'tenure'];
+  var OTHER = 'אחר';
+
+  // ---------- הגדרות חובה / רשות / לא מוצג ----------
+
+  function formKey() { return state.mode === 'empty' ? 'empty' : 'full'; }
+  function modeOf(k) { return S.getSettings()[formKey()][k]; }
+  function fld(k) { return form.querySelector('.fld[data-key="' + k + '"]'); }
+
+  function applySettings() {
+    form.querySelectorAll('.fld').forEach(function (el) {
+      var k = el.dataset.key, m = modeOf(k);
+      var hidden = m === 'hide' || (k === 'business_type_other' && getRadio('business_type') !== OTHER);
+      el.classList.toggle('hidden', hidden);
+      var label = el.querySelector('label.f');
+      if (!label) return;
+      var mark = label.querySelector('.mark');
+      if (!mark) { mark = document.createElement('span'); mark.className = 'mark'; label.appendChild(mark); }
+      mark.className = 'mark ' + (m === 'req' ? 'req' : 'opt');
+      mark.textContent = m === 'req' ? ' *' : ' (רשות)';
+    });
+  }
+
+  // "אחר" בסוג העסק פותח תיבת פירוט
+  field('business_type').addEventListener('change', function () {
+    if (getRadio('business_type') !== OTHER) field('business_type_other').value = '';
+    applySettings();
+    if (getRadio('business_type') === OTHER) field('business_type_other').focus();
+  });
+
+  // ---------- סימון שדות חסרים ----------
+
+  function clearErrors() {
+    form.querySelectorAll('.fld.invalid').forEach(function (el) { el.classList.remove('invalid'); });
+    form.querySelectorAll('.ferr').forEach(function (el) { el.remove(); });
+    $('formErr').textContent = '';
+  }
+  function clearFieldError(el) {
+    el.classList.remove('invalid');
+    var e = el.querySelector('.ferr'); if (e) e.remove();
+    if (!form.querySelector('.fld.invalid')) $('formErr').textContent = '';
+  }
+  form.addEventListener('input', function (e) { var el = e.target.closest('.fld'); if (el) clearFieldError(el); });
+  form.addEventListener('change', function (e) { var el = e.target.closest('.fld'); if (el) clearFieldError(el); });
+
+  function showErrors(errs) {
+    clearErrors();
+    errs.forEach(function (er) {
+      var el = fld(er.key);
+      el.classList.add('invalid');
+      var m = document.createElement('div'); m.className = 'ferr'; m.textContent = er.msg;
+      el.appendChild(m);
+    });
+    $('formErr').textContent = errs.length === 1 ? 'חסר שדה אחד – מסומן באדום' : 'יש ' + errs.length + ' שדות לתיקון – מסומנים באדום';
+    var first = fld(errs[0].key);
+    first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var input = first.querySelector('input:not([type=file]):not([type=radio]), textarea');
+    if (input) setTimeout(function () { input.focus({ preventScroll: true }); }, 350);
+  }
 
   function sideOf(house) {
     var n = parseInt(house, 10);
@@ -155,14 +219,57 @@
     }).join('') : '';
   }
 
-  // תמונה
+  // ---------- תמונה: מצלמה אחורית בתוך הדף ----------
+
   var photoFile = null;
-  $('f_photo').onchange = function () {
-    photoFile = $('f_photo').files[0] || null;
+  function setPhoto(file) {
+    photoFile = file || null;
     var prev = $('photoPrev');
     if (!photoFile) { prev.classList.add('hidden'); form.querySelector('.cam-text').textContent = 'צילום'; return; }
     prev.src = URL.createObjectURL(photoFile); prev.classList.remove('hidden');
     form.querySelector('.cam-text').textContent = 'צילום מחדש';
+    clearFieldError(fld('photo'));
+  }
+  $('f_gallery').onchange = function () { setPhoto($('f_gallery').files[0]); };
+  $('f_capture').onchange = function () { setPhoto($('f_capture').files[0]); };
+
+  var cam = { stream: null, facing: 'environment' };
+  function stopCamera() {
+    if (cam.stream) cam.stream.getTracks().forEach(function (t) { t.stop(); });
+    cam.stream = null;
+    $('camModal').classList.add('hidden');
+  }
+  function startCamera() {
+    if (cam.stream) cam.stream.getTracks().forEach(function (t) { t.stop(); });
+    return navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: cam.facing }, width: { ideal: 2560 }, height: { ideal: 1440 } }, audio: false
+    }).then(function (stream) {
+      cam.stream = stream;
+      $('camVideo').srcObject = stream;
+      $('camModal').classList.remove('hidden');
+    });
+  }
+  $('camBtn').onclick = function () {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $('f_capture').click(); return; }
+    cam.facing = 'environment';
+    startCamera().catch(function () {
+      // אין הרשאה / אין מצלמה - חוזרים לבחירת קובץ של המכשיר
+      toast('המצלמה לא נפתחה - עוברים למצלמה של המכשיר');
+      $('f_capture').click();
+    });
+  };
+  $('camSwitch').onclick = function () {
+    cam.facing = cam.facing === 'environment' ? 'user' : 'environment';
+    startCamera().catch(function () { toast('לא ניתן להחליף מצלמה'); });
+  };
+  $('camCancel').onclick = stopCamera;
+  $('camShoot').onclick = function () {
+    var v = $('camVideo');
+    if (!v.videoWidth) return;
+    var c = document.createElement('canvas');
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext('2d').drawImage(v, 0, 0);
+    c.toBlob(function (blob) { stopCamera(); setPhoto(blob); }, 'image/jpeg', 0.92);
   };
 
   // ---------- פתיחת טופס ----------
@@ -173,14 +280,13 @@
     preset = preset || {};
     state.mode = mode;
     state.editing = mode === 'complete' ? preset : null;
-    form.dataset.mode = mode === 'complete' ? 'full' : mode;
+    form.dataset.mode = formKey();
     $('formTitle').textContent = TITLES[mode];
     TEXT_FIELDS.forEach(function (k) { field(k).value = preset[k] != null ? preset[k] : ''; });
-    ['structure', 'business_type', 'tenure'].forEach(function (k) { setRadio(k, preset[k] || ''); });
-    $('f_photo').value = ''; photoFile = null;
-    $('photoPrev').classList.add('hidden');
-    form.querySelector('.cam-text').textContent = 'צילום';
-    $('formErr').textContent = '';
+    RADIO_FIELDS.forEach(function (k) { setRadio(k, preset[k] || ''); });
+    $('f_gallery').value = ''; $('f_capture').value = ''; setPhoto(null);
+    clearErrors();
+    applySettings();
     $('saveActions').classList.toggle('hidden', mode === 'complete');
     $('completeActions').classList.toggle('hidden', mode !== 'complete');
     $('homeView').classList.add('hidden');
@@ -220,27 +326,21 @@
   // ---------- קריאה ושמירה ----------
 
   function readForm() {
-    var full = form.dataset.mode === 'full';
-    var rec = {
-      structure: getRadio('structure'),
-      street: field('street').value.trim(),
-      house: field('house').value.trim(),
-      stall: field('stall').value.trim(),
-      business_name: field('business_name').value.trim(),
-      business_type: getRadio('business_type'),
-      note: field('note').value.trim(),
-      status: full ? 'filled' : 'closed'
-    };
-    rec.side = sideOf(rec.house);
-    if (full) {
-      ['first_name', 'last_name', 'phone', 'linked_to'].forEach(function (k) { rec[k] = field(k).value.trim(); });
-      rec.tenure = getRadio('tenure');
-    }
+    var rec = { status: state.mode === 'empty' ? 'closed' : 'filled' };
     var errs = [];
-    if (!rec.structure) errs.push('חסר: בסטה או חנות');
-    if (!rec.street && !rec.stall) errs.push('חסר: רחוב או תיאור מיקום');
-    if (full && !rec.business_name && !rec.first_name) errs.push('חסר: שם העסק או שם פרטי');
-    if (rec.phone && !/^[0-9+\-\s()]{7,}$/.test(rec.phone)) errs.push('מספר הטלפון לא תקין');
+    S.FIELDS.forEach(function (f) {
+      var k = f.key, m = modeOf(k);
+      if (m === 'hide' || k === 'photo') return;
+      if (k === 'business_type_other' && rec.business_type !== OTHER) return;
+      rec[k] = RADIO_FIELDS.indexOf(k) >= 0 ? getRadio(k) : field(k).value.trim();
+      if (m === 'req' && !rec[k]) errs.push({ key: k, msg: 'חסר: ' + f.label });
+    });
+    if (modeOf('photo') === 'req' && !photoFile) errs.push({ key: 'photo', msg: 'חסרה תמונה' });
+    if (rec.phone && !/^[0-9+\-\s()]{7,}$/.test(rec.phone)) errs.push({ key: 'phone', msg: 'מספר הטלפון לא תקין' });
+    rec.side = sideOf(rec.house || '');
+    // סדר השגיאות לפי סדר השדות בטופס
+    var order = S.FIELDS.map(function (f) { return f.key; });
+    errs.sort(function (a, b) { return order.indexOf(a.key) - order.indexOf(b.key); });
     return { rec: rec, errs: errs };
   }
 
@@ -260,13 +360,9 @@
 
   function save(next) {
     if (saving) return;
-    $('formErr').textContent = '';
     var r = readForm();
-    if (r.errs.length) {
-      $('formErr').innerHTML = r.errs.map(S.esc).join('<br>');
-      $('formErr').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
+    if (r.errs.length) { showErrors(r.errs); return; }
+    clearErrors();
     setSaving(true);
     var visit = state.visit || { id: S.uid() };
     var editing = state.editing, mode = state.mode;

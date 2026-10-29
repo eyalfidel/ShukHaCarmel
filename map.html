@@ -26,12 +26,12 @@
 <div id="mapWrap" class="hidden">
   <div id="map"></div>
   <aside class="side">
+    <div id="card" class="card bizcard hidden"></div>
     <div class="legend">
-      <span><i class="dot" style="background:var(--none)"></i>לא נסקר</span>
       <span><i class="dot" style="background:var(--ok)"></i>מולא</span>
-      <span><i class="dot" style="background:var(--warn)"></i>יש להשלים</span>
+      <span><i class="dot" style="background:var(--warn)"></i>ריק – להשלים</span>
       <span><i class="dot" style="background:#2b6cb0"></i>צומת</span>
-      <span><i class="dot" style="background:var(--ok);border-radius:2px"></i>כתובת לא ברשימה (לפי GPS)</span>
+      <span><i class="dot" style="background:#777;border-radius:2px"></i>ריבוע = לפי GPS</span>
     </div>
     <label class="f" for="fType">סוג עסק</label>
     <select id="fType"><option value="">הכול</option></select>
@@ -48,7 +48,7 @@
       <button id="jsonBtn" class="btn ghost small">ייצוא JSON</button>
       <button id="reloadBtn" class="btn ghost small">רענון</button>
     </div>
-    <h3 style="margin-top:16px">לפי כתובת</h3>
+    <h3 style="margin-top:16px">כל העסקים</h3>
     <div id="addrTable"></div>
   </aside>
 </div>

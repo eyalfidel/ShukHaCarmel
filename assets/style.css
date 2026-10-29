@@ -108,15 +108,31 @@ button.btn:disabled { opacity: .5; }
 button.btn.big { padding: 18px 16px; font-size: 18px; margin-top: 8px; }
 .center { text-align: center; margin: 6px 0 14px; }
 h3.section { margin: 18px 0 0; font-size: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
-#bizForm[data-mode="empty"] .full-only { display: none; }
-#bizForm[data-mode="full"] .empty-only { display: none; }
+/* חובה / רשות */
+.mark.req { color: #c62828; font-weight: 700; }
+.mark.opt { color: var(--muted); font-size: 12px; }
+/* שדה חסר */
+.fld.invalid input, .fld.invalid textarea { border-color: #c62828; box-shadow: 0 0 0 2px rgba(198,40,40,.15); }
+.fld.invalid .chips label { border-color: #c62828; }
+.fld.invalid .camera { border-color: #c62828; }
+.fld.invalid label.f { color: #c62828; }
+.ferr { color: #c62828; font-size: 13px; margin-top: 4px; }
+.gallery-link { display: block; text-align: center; margin-top: 8px; font-size: 14px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+/* מצלמה בתוך הדף */
+.cam-modal { position: fixed; inset: 0; background: #000; z-index: 100; display: flex; flex-direction: column; }
+.cam-modal video { flex: 1; width: 100%; min-height: 0; object-fit: contain; background: #000; }
+.cam-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 16px max(16px, env(safe-area-inset-bottom)); }
+.cam-bar .btn { min-width: 96px; }
+.shutter { width: 72px; height: 72px; border-radius: 50%; border: 5px solid #fff; background: var(--accent); cursor: pointer; flex: none; }
+.shutter:active { transform: scale(.94); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-label.camera {
+button.camera, label.camera {
+  width: 100%; font: inherit;
   display: flex; align-items: center; justify-content: center; gap: 10px;
   border: 2px dashed var(--accent); color: var(--accent); background: #fff6f3;
   border-radius: 12px; padding: 16px; font-size: 17px; font-weight: 600; cursor: pointer;
 }
-label.camera:active { background: #fde9e3; }
+button.camera:active, label.camera:active { background: #fde9e3; }
 .save-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
 .save-actions button small { display: block; font-size: 13px; opacity: .8; font-weight: normal; margin-top: 2px; }
 
@@ -142,3 +158,27 @@ table.biz td, table.biz th { border-bottom: 1px solid var(--line); padding: 4px;
 .mark-on #map { cursor: crosshair; }
 .leaflet-tooltip.jlabel { background: #2b6cb0; color: #fff; border: 0; font-weight: 600; padding: 2px 6px; }
 .leaflet-tooltip.jlabel::before { display: none; }
+
+/* עמוד ההגדרות */
+table.settings { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.settings th, table.settings td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: right; vertical-align: middle; }
+table.settings thead th { font-size: 14px; color: var(--muted); }
+table.settings select { padding: 6px 8px; }
+table.settings select.m-req { background: #fdecea; border-color: #e7a6a0; font-weight: 600; }
+table.settings select.m-hide { background: #eee; color: var(--muted); }
+.small { font-size: 12px; font-weight: normal; }
+
+/* סמני עסקים וכרטיס עסק במפה */
+.bizdot { width: 16px; height: 16px; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.5); box-sizing: border-box; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover { background: #f3efe6; }
+.bizcard { position: relative; }
+.bizcard h3 { margin: 0; }
+.card-photo img { width: 100%; max-height: 320px; object-fit: contain; border-radius: 8px; margin: 8px 0; cursor: zoom-in; background: #eee; }
+table.kv { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.kv th { text-align: right; color: var(--muted); font-weight: normal; padding: 4px 0 4px 10px; width: 34%; vertical-align: top; }
+table.kv td { padding: 4px 0; }
+@media (max-width: 820px) {
+  .bizcard { position: fixed; left: 0; right: 0; bottom: 0; max-height: 70vh; overflow: auto; z-index: 1000; margin: 0;
+    border-radius: 16px 16px 0 0; box-shadow: 0 -4px 18px rgba(0,0,0,.25); }
+}

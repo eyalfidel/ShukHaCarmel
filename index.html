@@ -23,6 +23,7 @@
     <span id="queueBadge" class="badge hidden"></span>
     <span id="userBadge" class="badge"></span>
     <a href="map.html">מפה</a>
+    <a href="settings.html" id="settingsLink" class="hidden">הגדרות</a>
   </header>
   <nav class="tabs">
     <button data-tab="report" class="active">דיווח</button>
@@ -48,52 +49,70 @@
             <button id="cancelForm" class="btn ghost small">ביטול</button>
           </div>
 
-          <label class="f">בסטה או חנות</label>
-          <div class="chips" data-field="structure"></div>
+          <div class="fld" data-key="structure">
+            <label class="f">בסטה או חנות</label>
+            <div class="chips" data-field="structure"></div>
+          </div>
 
-          <div class="full-only">
-            <div class="row2">
-              <div><label class="f" for="f_first">שם פרטי</label><input id="f_first" type="text" data-field="first_name" autocomplete="off"></div>
-              <div><label class="f" for="f_last">שם משפחה</label><input id="f_last" type="text" data-field="last_name" autocomplete="off"></div>
-            </div>
+          <div class="row2">
+            <div class="fld" data-key="first_name"><label class="f" for="f_first">שם פרטי</label><input id="f_first" type="text" data-field="first_name" autocomplete="off"></div>
+            <div class="fld" data-key="last_name"><label class="f" for="f_last">שם משפחה</label><input id="f_last" type="text" data-field="last_name" autocomplete="off"></div>
+          </div>
+          <div class="fld" data-key="phone">
             <label class="f" for="f_phone">טלפון</label>
             <input id="f_phone" type="tel" data-field="phone" inputmode="tel" autocomplete="off">
           </div>
 
-          <label class="f" for="f_name">שם העסק <span class="empty-only muted">(לא חובה)</span></label>
-          <input id="f_name" type="text" data-field="business_name" autocomplete="off">
-          <label class="f">סוג העסק <span class="empty-only muted">(לא חובה)</span></label>
-          <div class="chips" data-field="business_type"></div>
+          <div class="fld" data-key="business_name">
+            <label class="f" for="f_name">שם העסק</label>
+            <input id="f_name" type="text" data-field="business_name" autocomplete="off">
+          </div>
+          <div class="fld" data-key="business_type">
+            <label class="f">סוג העסק</label>
+            <div class="chips" data-field="business_type"></div>
+          </div>
+          <div class="fld hidden" data-key="business_type_other">
+            <label class="f" for="f_other">איזה סוג?</label>
+            <input id="f_other" type="text" data-field="business_type_other" autocomplete="off" placeholder="למשל: מספרה, סנדלר">
+          </div>
 
-          <div class="full-only">
+          <div class="fld" data-key="tenure">
             <label class="f">שוכר או בעלים</label>
             <div class="chips" data-field="tenure"></div>
           </div>
 
           <h3 class="section">כתובת</h3>
           <div class="row2 addr">
-            <div><label class="f" for="f_street">רחוב</label><input id="f_street" type="text" data-field="street" list="streetList" autocomplete="off"></div>
-            <div><label class="f" for="f_house">מספר</label><input id="f_house" type="text" data-field="house" inputmode="numeric" autocomplete="off"></div>
+            <div class="fld" data-key="street"><label class="f" for="f_street">רחוב</label><input id="f_street" type="text" data-field="street" list="streetList" autocomplete="off"></div>
+            <div class="fld" data-key="house"><label class="f" for="f_house">מספר</label><input id="f_house" type="text" data-field="house" inputmode="numeric" autocomplete="off"></div>
           </div>
           <div id="sideInfo" class="muted"></div>
-          <label class="f" for="f_stall">תיאור מיקום (טקסט חופשי)</label>
-          <input id="f_stall" type="text" data-field="stall" autocomplete="off" placeholder="למשל: הבסטה השלישית מהפינה עם רמב&quot;ם">
+          <div class="fld" data-key="stall">
+            <label class="f" for="f_stall">תיאור מיקום (טקסט חופשי)</label>
+            <input id="f_stall" type="text" data-field="stall" autocomplete="off" placeholder="למשל: הבסטה השלישית מהפינה עם רמב&quot;ם">
+          </div>
 
-          <div class="full-only">
+          <div class="fld" data-key="linked_to">
             <label class="f" for="f_linked">מקושר ל-</label>
             <input id="f_linked" type="text" data-field="linked_to" list="linkedList" autocomplete="off">
           </div>
 
-          <label class="f" for="f_note">הערה</label>
-          <textarea id="f_note" data-field="note"></textarea>
+          <div class="fld" data-key="note">
+            <label class="f" for="f_note">הערה</label>
+            <textarea id="f_note" data-field="note"></textarea>
+          </div>
 
-          <label class="f">תמונה</label>
-          <label class="camera" for="f_photo">
-            <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path fill="currentColor" d="M9 3 7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>
-            <span class="cam-text">צילום</span>
-          </label>
-          <input id="f_photo" type="file" accept="image/*" capture="environment" class="visually-hidden">
-          <img id="photoPrev" class="photo-prev hidden" alt="">
+          <div class="fld" data-key="photo">
+            <label class="f">תמונה</label>
+            <button type="button" class="camera" id="camBtn">
+              <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true"><path fill="currentColor" d="M9 3 7.2 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.2L15 3H9Zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></svg>
+              <span class="cam-text">צילום</span>
+            </button>
+            <label class="gallery-link" for="f_gallery">או בחירה מהגלריה</label>
+            <input id="f_gallery" type="file" accept="image/*" class="visually-hidden">
+            <input id="f_capture" type="file" accept="image/*" capture="environment" class="visually-hidden">
+            <img id="photoPrev" class="photo-prev hidden" alt="">
+          </div>
           <div id="gpsInfo" class="muted" style="margin-top:10px"></div>
           <div id="existingHere"></div>
         </div>
@@ -124,6 +143,16 @@
 
   <div class="actions" style="justify-content:center;padding-bottom:24px">
     <button id="logoutBtn" class="btn ghost small">יציאה</button>
+  </div>
+</div>
+
+<!-- מצלמה בתוך הדף (מצלמה אחורית) -->
+<div id="camModal" class="cam-modal hidden">
+  <video id="camVideo" autoplay playsinline muted></video>
+  <div class="cam-bar">
+    <button type="button" class="btn ghost" id="camCancel">ביטול</button>
+    <button type="button" class="shutter" id="camShoot" aria-label="צילום"></button>
+    <button type="button" class="btn ghost" id="camSwitch">החלפת מצלמה</button>
   </div>
 </div>
 
