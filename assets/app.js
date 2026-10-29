@@ -1,4 +1,4 @@
-/* טופס המילוי: דיווח על כתובת, השלמת עסקים סגורים, צמתים. */
+/* טופס המילוי: דיווח על כתובת או נקודה בשוק, והשלמת עסקים סגורים. */
 (function () {
   'use strict';
   var S = window.Shuk;
@@ -7,10 +7,12 @@
 
   var state = {
     byStreet: {},          // רחוב -> [כתובות]
-    junctionsCalc: [],     // צמתים מחושבים (data/junctions.json)
     server: { businesses: [], junctions: [] },
+    area: 'רחוב',          // 'רחוב' או שם אזור מתוך config (השוק המערבי, שוק הבשר...)
+    point: null,           // נקודה שנבחרה על המפה באזור בלי כתובות
     visit: null            // { id, gpsOpen }
   };
+  var placeMap = null, placeMarker = null;
   var cardSeq = 0;
 
   // ---------- כללי ----------
@@ -52,7 +54,7 @@
   document.querySelectorAll('nav.tabs button').forEach(function (b) {
     b.onclick = function () {
       document.querySelectorAll('nav.tabs button').forEach(function (x) { x.classList.toggle('active', x === b); });
-      ['report', 'pending', 'junction'].forEach(function (t) { $('tab-' + t).classList.toggle('hidden', t !== b.dataset.tab); });
+      ['report', 'pending'].forEach(function (t) { $('tab-' + t).classList.toggle('hidden', t !== b.dataset.tab); });
       if (b.dataset.tab !== 'report') refresh();
     };
   });
@@ -84,7 +86,7 @@
     if (!S.getCode()) return Promise.resolve();
     return S.apiGet({ code: S.getCode() }).then(function (j) {
       state.server = { businesses: j.businesses || [], junctions: j.junctions || [] };
-      renderLinkedList(); renderExisting(); renderPending(); renderJunctions();
+      renderLinkedList(); renderExisting(); renderPending();
     }, function (e) {
       if (e.auth) { S.logout(); showLogin(); }
       // בלי רשת - ממשיכים עם מה שיש
@@ -100,6 +102,16 @@
     }).join('') + (withOther ? '<option value="__other">מספר אחר…</option>' : '');
   }
 
+  // המיקום הנוכחי בטופס: כתובת ברחוב, או נקודה באזור בלי כתובות
+  function currentLoc() {
+    if (state.area !== S.STREET_AREA) {
+      if (!state.point) return null;
+      return { area: state.area, stall: $('stall').value.trim(), loc_lat: state.point.lat, loc_lng: state.point.lng };
+    }
+    var a = currentAddr();
+    return a && Object.assign({ area: S.STREET_AREA }, a);
+  }
+
   function currentAddr() {
     var street = $('street').value.trim(), house = $('house').value;
     if (!street || !house) return null;
@@ -111,6 +123,7 @@
 
   $('street').addEventListener('change', function () {
     houseOptions($('house'), $('street').value.trim(), true);
+    state.visit = null;
     onAddressChange();
   });
   $('house').addEventListener('change', function () {
@@ -121,31 +134,89 @@
         $('house').insertBefore(o, $('house').lastChild); $('house').value = v;
       } else $('house').value = '';
     }
+    state.visit = null;
     onAddressChange();
   });
 
+  function locText(l) {
+    return l.street ? l.street + ' ' + l.house + (l.side ? ' · צד ' + l.side : '') : l.area + (l.stall ? ' · ' + l.stall : '');
+  }
+
   function onAddressChange() {
-    var a = currentAddr();
+    var l = currentLoc();
     renderExisting();
-    if (!a) { $('addrInfo').textContent = ''; state.visit = null; return; }
+    if (!l) { $('addrInfo').textContent = state.area === S.STREET_AREA ? '' : 'צריך לסמן נקודה על המפה'; state.visit = null; return; }
+    if (state.visit) { $('addrInfo').textContent = locText(l) + gpsText(state.visit.gpsOpen); return; }
     // ביקור חדש: GPS פתיחה
-    var visit = state.visit = { id: S.uid(), gpsOpen: null };
-    $('addrInfo').textContent = a.street + ' ' + a.house + (a.side ? ' · צד ' + a.side : '') + ' · מאתר מיקום…';
+    var visit = state.visit = { id: S.uid(), gpsOpen: undefined };
+    $('addrInfo').textContent = locText(l) + ' · מאתר מיקום…';
     S.gps().then(function (g) {
       if (state.visit !== visit) return;
       visit.gpsOpen = g;
-      $('addrInfo').textContent = a.street + ' ' + a.house + (a.side ? ' · צד ' + a.side : '') +
-        (g ? ' · מיקום נשמר (±' + g.acc + ' מ\')' : ' · אין מיקום');
+      var cur = currentLoc();
+      if (cur) $('addrInfo').textContent = locText(cur) + gpsText(g);
     });
   }
+  function gpsText(g) {
+    if (g === undefined) return ' · מאתר מיקום…';
+    return g ? ' · מיקום נשמר (±' + g.acc + ' מ\')' : ' · אין מיקום';
+  }
+
+  // ---------- אזורים בלי כתובות ----------
+
+  function setArea(area) {
+    state.area = area;
+    state.visit = null;
+    var isStreet = area === S.STREET_AREA;
+    $('streetBox').classList.toggle('hidden', !isStreet);
+    $('placeBox').classList.toggle('hidden', isStreet);
+    if (!isStreet) {
+      initPlaceMap();
+      if (!state.point) locateMe();
+    }
+    onAddressChange();
+  }
+
+  function initPlaceMap() {
+    if (placeMap || !window.L) { if (placeMap) setTimeout(function () { placeMap.invalidateSize(); }, 50); return; }
+    placeMap = L.map('placeMap').setView(S.CENTER, 19);
+    S.baseLayers(placeMap);
+    placeMap.on('click', function (e) { setPoint(e.latlng.lat, e.latlng.lng); });
+    setTimeout(function () { placeMap.invalidateSize(); }, 50);
+  }
+
+  function setPoint(lat, lng) {
+    state.point = { lat: +lat.toFixed(6), lng: +lng.toFixed(6) };
+    if (placeMap) {
+      if (!placeMarker) {
+        placeMarker = L.marker([lat, lng], { draggable: true, icon: L.divIcon({ className: 'pin', iconSize: [22, 22], iconAnchor: [11, 22] }) }).addTo(placeMap);
+        placeMarker.on('dragend', function () { var p = placeMarker.getLatLng(); setPoint(p.lat, p.lng); });
+      } else placeMarker.setLatLng([lat, lng]);
+    }
+    onAddressChange();
+  }
+
+  function locateMe() {
+    S.gps().then(function (g) {
+      if (!g) return toast('אין מיקום - לחצו על המפה במקום הדוכן');
+      setPoint(g.lat, g.lng);
+      if (placeMap) placeMap.setView([g.lat, g.lng], 19);
+    });
+  }
+  $('useGps').onclick = locateMe;
+  $('stall').addEventListener('input', function () { var l = currentLoc(); if (l) $('addrInfo').textContent = locText(l) + gpsText(state.visit && state.visit.gpsOpen); });
 
   function renderExisting() {
-    var a = currentAddr(), box = $('existingAtAddr');
-    if (!a) { box.innerHTML = ''; return; }
-    var rows = state.server.businesses.filter(function (b) { return b.street === a.street && String(b.house) === a.house; });
-    if (!rows.length) { box.innerHTML = '<p class="muted">עוד לא דווחו עסקים בכתובת הזו.</p>'; return; }
-    box.innerHTML = '<p class="muted" style="margin-bottom:0">כבר דווחו כאן:</p>' + rows.map(function (b) {
-      return '<div class="list-item"><span>' + bizLabel(b) + '</span>' +
+    var l = currentLoc(), box = $('existingAtAddr');
+    if (!l) { box.innerHTML = ''; return; }
+    var rows = state.server.businesses.filter(function (b) {
+      if (l.street) return b.street === l.street && String(b.house) === l.house;
+      // באזור בלי כתובות: עסקים שסומנו עד 15 מטר מהנקודה
+      return b.area === l.area && b.loc_lat && S.distM(+b.loc_lat, +b.loc_lng, l.loc_lat, l.loc_lng) <= 15;
+    });
+    if (!rows.length) { box.innerHTML = '<p class="muted">עוד לא דווחו עסקים ' + (l.street ? 'בכתובת הזו.' : 'ליד הנקודה הזו.') + '</p>'; return; }
+    box.innerHTML = '<p class="muted" style="margin-bottom:0">' + (l.street ? 'כבר דווחו כאן:' : 'כבר דווחו בקרבת מקום:') + '</p>' + rows.map(function (b) {
+      return '<div class="list-item"><span>' + (l.street ? '' : S.esc(b.stall || '') + ' ') + bizLabel(b) + '</span>' +
         (b.status === 'closed' ? '<button class="btn small" data-edit="' + S.esc(b.id) + '">השלמה</button>' : '') + '</div>';
     }).join('');
     box.querySelectorAll('[data-edit]').forEach(function (btn) {
@@ -253,32 +324,35 @@
 
   $('submitVisit').onclick = function () {
     $('submitErr').textContent = '';
-    var a = currentAddr();
-    if (!a) { $('submitErr').textContent = 'צריך לבחור כתובת'; return; }
+    var a = currentLoc();
+    if (!a) { $('submitErr').textContent = state.area === S.STREET_AREA ? 'צריך לבחור כתובת' : 'צריך לסמן נקודה על המפה'; return; }
     var btn = $('submitVisit'); btn.disabled = true;
     var visit = state.visit || { id: S.uid(), gpsOpen: null };
     Promise.all(cards.map(function (c) { return c.read(); })).then(function (res) {
       var errs = [];
       res.forEach(function (r, i) { r.errs.forEach(function (e) { errs.push('עסק ' + (i + 1) + ': ' + e); }); });
       if (errs.length) { $('submitErr').innerHTML = errs.map(S.esc).join('<br>'); return; }
-      return S.gps().then(function (g) {
+      return S.gps(4000).then(function (g) {
         var go = visit.gpsOpen || {}, gc = g || {};
         var payload = {
           action: 'submitVisit', visit_id: visit.id,
-          street: a.street, house: a.house, side: a.side,
+          street: a.street || '', house: a.house || '', side: a.side || '',
+          area: a.area, stall: a.stall || '', loc_lat: a.loc_lat || '', loc_lng: a.loc_lng || '',
           gps_open_lat: go.lat, gps_open_lng: go.lng, gps_open_acc: go.acc,
           gps_close_lat: gc.lat, gps_close_lng: gc.lng, gps_close_acc: gc.acc,
           businesses: res.map(function (r) { return Object.assign({ client_id: S.uid() }, r.rec); })
         };
         // מוסיפים מקומית כדי שיופיע מיד ב"כבר דווחו כאן" גם בלי רשת
         payload.businesses.forEach(function (b) {
-          state.server.businesses.push(Object.assign({ street: a.street, house: a.house, side: a.side, id: '' }, b, { photo: undefined }));
+          state.server.businesses.push(Object.assign({}, a, { id: '' }, b, { photo: undefined }));
         });
-        return S.enqueue(payload, a.street + ' ' + a.house).then(function () {
-          toast('נשמר: ' + a.street + ' ' + a.house + ' (' + payload.businesses.length + ' עסקים)');
+        var label = S.placeLabel(a);
+        return S.enqueue(payload, label).then(function () {
+          toast('נשמר: ' + label + ' (' + payload.businesses.length + ' עסקים)');
           cards.forEach(function (c) { c.el.remove(); }); cards = [];
           addCard();
           state.visit = null;
+          if (!a.street) { $('stall').value = ''; onAddressChange(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
           // מקדמים לכתובת הבאה באותו צד, כדי לחסוך בחירה
           var list = state.byStreet[a.street] || [];
           var same = list.filter(function (x) { return x.side === a.side; });
@@ -296,11 +370,14 @@
 
   function renderPending() {
     var rows = state.server.businesses.filter(function (b) { return b.status === 'closed' && b.id; });
-    rows.sort(function (x, y) { return x.street.localeCompare(y.street) || S.cmpHouse(String(x.house), String(y.house)); });
+    rows.sort(function (x, y) {
+      return String(x.area || '').localeCompare(y.area || '') || String(x.street || '').localeCompare(y.street || '') ||
+        S.cmpHouse(String(x.house), String(y.house));
+    });
     $('pendingCount').textContent = rows.length ? '(' + rows.length + ')' : '';
     if (!rows.length) { $('pendingList').innerHTML = 'אין כרגע עסקים להשלמה.'; return; }
     $('pendingList').innerHTML = rows.map(function (b) {
-      return '<div class="list-item"><span><b>' + S.esc(b.street + ' ' + b.house) + '</b> · ' + S.esc(b.structure || '') +
+      return '<div class="list-item"><span><b>' + S.esc(S.placeLabel(b)) + '</b> · ' + S.esc(b.structure || '') +
         (b.note ? '<br><span class="muted">' + S.esc(b.note) + '</span>' : '') +
         '<br><span class="muted">סומן ע"י ' + S.esc(b.created_by || '') + '</span></span>' +
         '<button class="btn small" data-edit="' + S.esc(b.id) + '">השלמה</button></div>';
@@ -315,7 +392,7 @@
     if (!b) return;
     document.querySelector('nav.tabs button[data-tab="pending"]').click();
     var wrap = $('editWrap'); wrap.innerHTML = '';
-    var c = makeCard(b, { completing: true, noRemove: true, title: 'השלמה: ' + b.street + ' ' + b.house });
+    var c = makeCard(b, { completing: true, noRemove: true, title: 'השלמה: ' + S.placeLabel(b) });
     var actions = document.createElement('div'); actions.className = 'actions';
     actions.innerHTML = '<button class="btn primary">שמירה</button><button class="btn ghost">ביטול</button><div class="err" style="width:100%"></div>';
     c.el.appendChild(actions);
@@ -327,13 +404,13 @@
       var btn = actions.children[0]; btn.disabled = true;
       c.read().then(function (r) {
         if (r.errs.length) { actions.children[2].innerHTML = r.errs.map(S.esc).join('<br>'); return; }
-        return Promise.all([gpsOpenP, S.gps()]).then(function (g) {
+        return Promise.all([gpsOpenP, S.gps(4000)]).then(function (g) {
           var go = g[0] || {}, gc = g[1] || {};
           var upd = Object.assign({}, r.rec, {
             gps_open_lat: go.lat, gps_open_lng: go.lng, gps_open_acc: go.acc,
             gps_close_lat: gc.lat, gps_close_lng: gc.lng, gps_close_acc: gc.acc
           });
-          return S.enqueue({ action: 'updateBusiness', id: b.id, business: upd }, 'השלמה ' + b.street + ' ' + b.house).then(function () {
+          return S.enqueue({ action: 'updateBusiness', id: b.id, business: upd }, 'השלמה ' + S.placeLabel(b)).then(function () {
             Object.assign(b, upd, { photo: undefined });
             wrap.innerHTML = '';
             renderPending(); renderExisting();
@@ -345,72 +422,19 @@
   }
   $('refreshBtn').onclick = function () { refresh().then(function () { toast('עודכן'); }); };
 
-  // ---------- צמתים ----------
-
-  function renderJunctions() {
-    var done = {};
-    state.server.junctions.forEach(function (j) { done[j.cross_street] = j; });
-    var fmt = function (arr) {
-      if (arr[0] && arr[1]) return 'בין ' + arr[0] + '–' + arr[1];
-      return arr[0] ? 'אחרי ' + arr[0] : arr[1] ? 'לפני ' + arr[1] : '?';
-    };
-    $('juncList').innerHTML = state.junctionsCalc.map(function (j, i) {
-      var ok = done[j.cross_street];
-      var sides = [];
-      if (j.odd_side) sides.push('אי-זוגי ' + fmt(j.odd_between));
-      if (j.even_side) sides.push('זוגי ' + fmt(j.even_between));
-      return '<div class="list-item"><span><b>' + S.esc(j.cross_street) + '</b><br><span class="muted">' + S.esc(sides.join(' · ')) + '</span></span>' +
-        (ok ? '<span class="side-pill">אושר ע"י ' + S.esc(ok.created_by || '') + '</span>' : '<button class="btn small" data-j="' + i + '">אישור</button>') + '</div>';
-    }).join('');
-    var extra = state.server.junctions.filter(function (j) {
-      return !state.junctionsCalc.some(function (c) { return c.cross_street === j.cross_street; });
-    });
-    if (extra.length) {
-      $('juncList').innerHTML += '<p class="muted">נוספו ידנית:</p>' + extra.map(function (j) {
-        return '<div class="list-item"><span><b>' + S.esc(j.cross_street) + '</b> · ' + S.esc(j.side || '') + ' בין ' + S.esc(j.between_from + '–' + j.between_to) + '</span><span class="muted">' + S.esc(j.created_by || '') + '</span></div>';
-      }).join('');
-    }
-    $('juncList').querySelectorAll('[data-j]').forEach(function (btn) {
-      btn.onclick = function () {
-        var j = state.junctionsCalc[+btn.dataset.j];
-        var side = j.odd_side && j.even_side ? 'שני הצדדים' : (j.odd_side ? 'אי-זוגי' : 'זוגי');
-        var bt = j.odd_side ? j.odd_between : j.even_between;
-        sendJunction({ street: j.street, cross_street: j.cross_street, side: side, between_from: bt[0] || '', between_to: bt[1] || '', note: '' });
-      };
-    });
-  }
-
-  function sendJunction(rec) {
-    return S.gps().then(function (g) {
-      rec.client_id = S.uid();
-      if (g) { rec.lat = g.lat; rec.lng = g.lng; }
-      return S.enqueue({ action: 'addJunction', junction: rec }, 'צומת ' + rec.cross_street).then(function () {
-        state.server.junctions.push(Object.assign({ created_by: S.getUser() }, rec));
-        renderJunctions();
-        toast('הצומת נרשם: ' + rec.cross_street);
-      });
-    });
-  }
-
-  $('jAdd').onclick = function () {
-    var cross = $('jCross').value.trim();
-    var side = (document.querySelector('input[name=jside]:checked') || {}).value;
-    if (!cross || !side) return toast('צריך רחוב חוצה וצד');
-    sendJunction({ street: MAIN_STREET, cross_street: cross, side: side, between_from: $('jFrom').value, between_to: $('jTo').value, note: $('jNote').value.trim() })
-      .then(function () { $('jCross').value = ''; $('jNote').value = ''; });
-  };
-
   // ---------- טעינה ----------
 
-  Promise.all([S.loadJSON('data/addresses.json'), S.loadJSON('data/junctions.json')]).then(function (r) {
-    r[0].forEach(function (a) { (state.byStreet[a.street] = state.byStreet[a.street] || []).push(a); });
+  $('areaChips').innerHTML = [S.STREET_AREA].concat(S.AREAS).map(function (a, i) {
+    return '<label><input type="radio" name="area" value="' + S.esc(a) + '"' + (i ? '' : ' checked') + '>' + S.esc(i ? a : 'רחוב (לפי כתובת)') + '</label>';
+  }).join('');
+  $('areaChips').addEventListener('change', function (e) { setArea(e.target.value); });
+
+  S.loadJSON('data/addresses.json').then(function (rows) {
+    rows.forEach(function (a) { (state.byStreet[a.street] = state.byStreet[a.street] || []).push(a); });
     Object.keys(state.byStreet).forEach(function (s) { state.byStreet[s].sort(function (x, y) { return S.cmpHouse(x.house, y.house); }); });
     var streets = Object.keys(state.byStreet).sort(function (a, b) { return (a !== MAIN_STREET) - (b !== MAIN_STREET) || a.localeCompare(b, 'he'); });
     $('streetList').innerHTML = streets.map(function (s) { return '<option value="' + S.esc(s) + '">'; }).join('');
     houseOptions($('house'), MAIN_STREET, true);
-    houseOptions($('jFrom'), MAIN_STREET); houseOptions($('jTo'), MAIN_STREET);
-    state.junctionsCalc = r[1];
-    renderJunctions();
   });
   addCard();
   if (S.getCode()) showApp(); else showLogin();

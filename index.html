@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>מיפוי שוק הכרמל</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
   <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
@@ -27,23 +28,32 @@
   <nav class="tabs">
     <button data-tab="report" class="active">דיווח</button>
     <button data-tab="pending">להשלים <span id="pendingCount"></span></button>
-    <button data-tab="junction">צומת</button>
   </nav>
 
   <main>
     <!-- דיווח -->
     <section id="tab-report">
       <div class="card">
-        <h2>כתובת</h2>
-        <div class="row2">
-          <div>
-            <label class="f" for="street">רחוב</label>
-            <input id="street" type="text" list="streetList" value="הכרמל" autocomplete="off">
+        <h2>מיקום</h2>
+        <div class="chips" id="areaChips"></div>
+        <div id="streetBox">
+          <div class="row2">
+            <div>
+              <label class="f" for="street">רחוב</label>
+              <input id="street" type="text" list="streetList" value="הכרמל" autocomplete="off">
+            </div>
+            <div>
+              <label class="f" for="house">מספר</label>
+              <select id="house"></select>
+            </div>
           </div>
-          <div>
-            <label class="f" for="house">מספר</label>
-            <select id="house"></select>
-          </div>
+        </div>
+        <div id="placeBox" class="hidden">
+          <label class="f">נקודה על המפה (לחיצה על המפה מזיזה את הסיכה)</label>
+          <div id="placeMap"></div>
+          <div class="actions" style="margin-top:6px"><button id="useGps" class="btn ghost small">למיקום שלי</button></div>
+          <label class="f" for="stall">תיאור מיקום / מספר דוכן</label>
+          <input id="stall" type="text" autocomplete="off" placeholder="למשל: דוכן שלישי מהכניסה">
         </div>
         <div id="addrInfo" class="muted" style="margin-top:8px"></div>
         <div id="existingAtAddr"></div>
@@ -72,32 +82,6 @@
       <div id="editWrap"></div>
     </section>
 
-    <!-- צומת -->
-    <section id="tab-junction" class="hidden">
-      <div class="card">
-        <h2>צמתים לאורך הכרמל</h2>
-        <p class="muted">רשימה שחושבה מראש מהמפה. כשמגיעים לצומת - "אישור" רושם אותו. אם משהו לא נכון, מוסיפים צומת ידנית למטה.</p>
-        <div id="juncList"></div>
-      </div>
-      <div class="card">
-        <h3>הוספת צומת ידנית</h3>
-        <label class="f" for="jCross">רחוב חוצה</label>
-        <input id="jCross" type="text" list="streetList" autocomplete="off">
-        <label class="f">צד</label>
-        <div class="chips" id="jSide">
-          <label><input type="radio" name="jside" value="אי-זוגי">אי-זוגי</label>
-          <label><input type="radio" name="jside" value="זוגי">זוגי</label>
-          <label><input type="radio" name="jside" value="שני הצדדים">שני הצדדים</label>
-        </div>
-        <div class="row2">
-          <div><label class="f" for="jFrom">בין מספר</label><select id="jFrom"></select></div>
-          <div><label class="f" for="jTo">לבין מספר</label><select id="jTo"></select></div>
-        </div>
-        <label class="f" for="jNote">הערה</label>
-        <input id="jNote" type="text">
-        <div class="actions"><button id="jAdd" class="btn primary block">הוספת צומת</button></div>
-      </div>
-    </section>
   </main>
 
   <div class="actions" style="justify-content:center;padding-bottom:24px">
@@ -141,6 +125,7 @@
   </div>
 </template>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="config.js"></script>
 <script src="assets/common.js"></script>
 <script src="assets/app.js"></script>

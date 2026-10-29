@@ -9,7 +9,11 @@
 var SHEET_USERS = 'users';
 var SHEET_BUSINESSES = 'businesses';
 var SHEET_JUNCTIONS = 'junctions';
-var PHOTO_FOLDER_NAME = 'שוק הכרמל - תמונות';
+var PHOTO_FOLDER_NAME = 'תמונות';
+// הגיליון. ריק = הגיליון שהסקריפט מחובר אליו (Extensions → Apps Script).
+var SPREADSHEET_ID = '1s67VqWINNlnxRNc-venxtaeFsSk-Yamh4Kxqj_KcbwY';
+// התיקייה בדרייב שאליה נשמרות התמונות. ריק = נוצרת אוטומטית ב-setup.
+var PHOTO_FOLDER_ID = '1kv6NWlrT108b8jtoh_jgm2wcUHXoj1HO';
 
 // [מפתח, כותרת בגיליון]. סדר העמודות בגיליון = סדר המערך.
 var BUSINESS_COLS = [
@@ -18,6 +22,10 @@ var BUSINESS_COLS = [
   ['street', 'רחוב'],
   ['house', 'מספר'],
   ['side', 'צד'],
+  ['area', 'אזור'],
+  ['stall', 'תיאור מיקום / דוכן'],
+  ['loc_lat', 'מיקום lat'],
+  ['loc_lng', 'מיקום lng'],
   ['status', 'סטטוס'],
   ['first_name', 'שם פרטי'],
   ['last_name', 'שם משפחה'],
@@ -46,9 +54,6 @@ var JUNCTION_COLS = [
   ['id', 'מזהה'],
   ['street', 'רחוב'],
   ['cross_street', 'רחוב חוצה'],
-  ['side', 'צד'],
-  ['between_from', 'בין מספר'],
-  ['between_to', 'לבין מספר'],
   ['note', 'הערה'],
   ['lat', 'lat'],
   ['lng', 'lng'],
@@ -58,13 +63,17 @@ var JUNCTION_COLS = [
 ];
 
 // שדות שהלקוח רשאי לכתוב בעסק (השאר נקבעים בשרת)
-var BUSINESS_WRITABLE = ['street', 'house', 'side', 'status', 'first_name', 'last_name', 'phone',
+var BUSINESS_WRITABLE = ['street', 'house', 'side', 'area', 'stall', 'loc_lat', 'loc_lng', 'status', 'first_name', 'last_name', 'phone',
   'business_name', 'business_type', 'structure', 'tenure', 'linked_to', 'note',
   'gps_open_lat', 'gps_open_lng', 'gps_open_acc', 'gps_close_lat', 'gps_close_lng', 'gps_close_acc'];
 
+function ss_() {
+  return SPREADSHEET_ID ? SpreadsheetApp.openById(SPREADSHEET_ID) : SpreadsheetApp.getActive();
+}
+
 /** להריץ פעם אחת מתוך העורך: יוצר לשוניות, כותרות ותיקיית תמונות. */
 function setup() {
-  var ss = SpreadsheetApp.getActive();
+  var ss = ss_();
   ensureSheet_(ss, SHEET_USERS, ['שם', 'קוד', 'פעיל']);
   ensureSheet_(ss, SHEET_BUSINESSES, BUSINESS_COLS.map(function (c) { return c[1]; }));
   ensureSheet_(ss, SHEET_JUNCTIONS, JUNCTION_COLS.map(function (c) { return c[1]; }));
@@ -95,6 +104,7 @@ function randomCode_() {
 }
 
 function photoFolder_() {
+  if (PHOTO_FOLDER_ID) return DriveApp.getFolderById(PHOTO_FOLDER_ID);
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('PHOTO_FOLDER_ID');
   if (id) {
@@ -131,6 +141,7 @@ function doPost(e) {
       if (body.action === 'submitVisit') return submitVisit_(user, body);
       if (body.action === 'updateBusiness') return updateBusiness_(user, body);
       if (body.action === 'addJunction') return addJunction_(user, body);
+      if (body.action === 'deleteJunction') return deleteJunction_(body);
       throw new Error('פעולה לא מוכרת');
     } finally {
       lock.releaseLock();
@@ -151,7 +162,7 @@ function handle_(fn) {
 function auth_(code) {
   code = String(code || '').trim();
   if (!code) throw new Error('AUTH');
-  var rows = SpreadsheetApp.getActive().getSheetByName(SHEET_USERS).getDataRange().getValues();
+  var rows = ss_().getSheetByName(SHEET_USERS).getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
     var active = rows[i][2] === true || String(rows[i][2]).toUpperCase() === 'TRUE';
     if (String(rows[i][1]).trim() === code && active) return String(rows[i][0]);
@@ -162,7 +173,7 @@ function auth_(code) {
 // ---------- פעולות ----------
 
 function submitVisit_(user, body) {
-  var sh = SpreadsheetApp.getActive().getSheetByName(SHEET_BUSINESSES);
+  var sh = ss_().getSheetByName(SHEET_BUSINESSES);
   var existing = columnValues_(sh, BUSINESS_COLS, 'client_id');
   var now = new Date();
   var visitId = body.visit_id || Utilities.getUuid();
@@ -173,7 +184,7 @@ function submitVisit_(user, body) {
       return;
     }
     var rec = pick_(b, BUSINESS_WRITABLE);
-    ['street', 'house', 'side', 'gps_open_lat', 'gps_open_lng', 'gps_open_acc',
+    ['street', 'house', 'side', 'area', 'stall', 'loc_lat', 'loc_lng', 'gps_open_lat', 'gps_open_lng', 'gps_open_acc',
       'gps_close_lat', 'gps_close_lng', 'gps_close_acc'].forEach(function (k) {
       if (rec[k] === undefined || rec[k] === '') rec[k] = body[k];
     });
@@ -191,7 +202,7 @@ function submitVisit_(user, body) {
 }
 
 function updateBusiness_(user, body) {
-  var sh = SpreadsheetApp.getActive().getSheetByName(SHEET_BUSINESSES);
+  var sh = ss_().getSheetByName(SHEET_BUSINESSES);
   var idCol = colIndex_(BUSINESS_COLS, 'id');
   var ids = sh.getRange(1, idCol + 1, sh.getLastRow(), 1).getValues();
   for (var r = 1; r < ids.length; r++) {
@@ -212,11 +223,11 @@ function updateBusiness_(user, body) {
 }
 
 function addJunction_(user, body) {
-  var sh = SpreadsheetApp.getActive().getSheetByName(SHEET_JUNCTIONS);
+  var sh = ss_().getSheetByName(SHEET_JUNCTIONS);
   var j = body.junction || {};
   var existing = columnValues_(sh, JUNCTION_COLS, 'client_id');
   if (j.client_id && existing[j.client_id]) return { ok: true, id: existing[j.client_id] };
-  var rec = pick_(j, ['street', 'cross_street', 'side', 'between_from', 'between_to', 'note', 'lat', 'lng']);
+  var rec = pick_(j, ['street', 'cross_street', 'note', 'lat', 'lng']);
   rec.id = Utilities.getUuid().slice(0, 8);
   rec.created_by = user;
   rec.created_at = new Date();
@@ -225,10 +236,23 @@ function addJunction_(user, body) {
   return { ok: true, id: rec.id };
 }
 
+function deleteJunction_(body) {
+  var sh = ss_().getSheetByName(SHEET_JUNCTIONS);
+  var idCol = colIndex_(JUNCTION_COLS, 'id') + 1;
+  var last = sh.getLastRow();
+  if (last < 2) return { ok: true };
+  var ids = sh.getRange(2, idCol, last - 1, 1).getValues();
+  for (var i = ids.length - 1; i >= 0; i--) {
+    if (String(ids[i][0]) === String(body.id)) sh.deleteRow(i + 2);
+  }
+  return { ok: true };
+}
+
 function savePhoto_(dataUrl, rec) {
   var m = /^data:(image\/[a-z+]+);base64,(.*)$/.exec(String(dataUrl));
   if (!m) return '';
-  var name = [rec.street, rec.house, rec.business_name || rec.structure || '', rec.id].join('_') + '.jpg';
+  var where = rec.street ? rec.street + '_' + rec.house : (rec.area || '') + '_' + (rec.stall || '');
+  var name = [where, rec.business_name || rec.structure || '', rec.id].join('_') + '.jpg';
   var blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], name);
   var file = photoFolder_().createFile(blob);
   return file.getUrl();
@@ -267,7 +291,7 @@ function fromRow_(row, cols, keepDates) {
 }
 
 function readAll_(name, cols) {
-  var sh = SpreadsheetApp.getActive().getSheetByName(name);
+  var sh = ss_().getSheetByName(name);
   var rows = sh.getDataRange().getValues();
   var out = [];
   for (var i = 1; i < rows.length; i++) {

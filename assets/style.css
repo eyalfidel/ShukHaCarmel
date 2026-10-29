@@ -102,6 +102,10 @@ button.btn:disabled { opacity: .5; }
 
 .login { max-width: 360px; margin: 12vh auto 0; }
 
+#placeMap { height: 240px; border-radius: 10px; border: 1px solid var(--line); }
+#areaChips { margin-bottom: 4px; }
+.pin { background: var(--accent); border: 3px solid #fff; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+
 /* מפה */
 body.mapPage { height: 100vh; display: flex; flex-direction: column; }
 #mapWrap { flex: 1; display: flex; min-height: 0; }
@@ -119,3 +123,8 @@ table.biz td, table.biz th { border-bottom: 1px solid var(--line); padding: 4px;
   #mapWrap { flex-direction: column; }
   aside.side { width: auto; max-height: 45vh; border-inline-start: 0; border-top: 1px solid var(--line); }
 }
+
+.jform input { width: 100%; margin: 4px 0; }
+.mark-on #map { cursor: crosshair; }
+.leaflet-tooltip.jlabel { background: #2b6cb0; color: #fff; border: 0; font-weight: 600; padding: 2px 6px; }
+.leaflet-tooltip.jlabel::before { display: none; }

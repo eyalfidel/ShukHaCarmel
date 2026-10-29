@@ -10,6 +10,8 @@
   var STRUCTURES = ['בסטה', 'חנות'];
   var TENURES = ['שוכר', 'בעלים'];
   var STATUS_LABEL = { filled: 'מולא', closed: 'סגור – להשלים' };
+  var STREET_AREA = 'רחוב';
+  var AREAS = CFG.AREAS || [];
 
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { } }
@@ -76,7 +78,7 @@
           var dup = db.businesses.filter(function (r) { return x.client_id && r.client_id === x.client_id; })[0];
           if (dup) { ids.push(dup.id); return; }
           var rec = Object.assign({}, x);
-          ['street', 'house', 'side', 'gps_open_lat', 'gps_open_lng', 'gps_open_acc', 'gps_close_lat', 'gps_close_lng', 'gps_close_acc']
+          ['street', 'house', 'side', 'area', 'stall', 'loc_lat', 'loc_lng', 'gps_open_lat', 'gps_open_lng', 'gps_open_acc', 'gps_close_lat', 'gps_close_lng', 'gps_close_acc']
             .forEach(function (k) { if (rec[k] === undefined || rec[k] === '') rec[k] = b[k]; });
           rec.id = uid().slice(0, 8); rec.visit_id = visit;
           rec.photo_url = x.photo ? '(תמונה בהדגמה)' : ''; delete rec.photo;
@@ -100,6 +102,10 @@
         var j = Object.assign({}, b.junction, { id: uid().slice(0, 8), created_by: who, created_at: now });
         db.junctions.push(j); Mock.save(db);
         return { ok: true, id: j.id };
+      }
+      if (b.action === 'deleteJunction') {
+        db.junctions = db.junctions.filter(function (x) { return x.id !== b.id; }); Mock.save(db);
+        return { ok: true };
       }
       return { ok: false, error: 'פעולה לא מוכרת' };
     }
@@ -183,12 +189,17 @@
 
   // ---------- GPS ----------
 
-  function gps() {
+  // maxWaitMs: כמה זמן מוכנים לחכות. בשמירה מחכים מעט, כדי לא לעכב את הפעיל.
+  function gps(maxWaitMs) {
+    var wait = maxWaitMs || 15000;
     return new Promise(function (resolve) {
       if (!navigator.geolocation) return resolve(null);
+      var done = false;
+      var finish = function (v) { if (!done) { done = true; resolve(v); } };
+      setTimeout(function () { finish(null); }, wait + 500);
       navigator.geolocation.getCurrentPosition(function (p) {
-        resolve({ lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6), acc: Math.round(p.coords.accuracy) });
-      }, function () { resolve(null); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+        finish({ lat: +p.coords.latitude.toFixed(6), lng: +p.coords.longitude.toFixed(6), acc: Math.round(p.coords.accuracy) });
+      }, function () { finish(null); }, { enableHighAccuracy: true, timeout: wait, maximumAge: 10000 });
     });
   }
 
@@ -227,6 +238,23 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
+  // "הכרמל 45" או "שוק הבשר · דוכן 3"
+  function placeLabel(b) {
+    if (b.street) return b.street + ' ' + b.house;
+    return (b.area || '') + (b.stall ? ' · ' + b.stall : '');
+  }
+  function distM(lat1, lng1, lat2, lng2) {
+    var dy = (lat2 - lat1) * 111320, dx = (lng2 - lng1) * 111320 * Math.cos(lat1 * Math.PI / 180);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function baseLayers(map) {
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 21, maxNativeZoom: 19, attribution: 'Esri'
+    }).addTo(map);
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 21, maxNativeZoom: 19, opacity: .7
+    }).addTo(map);
+  }
   function loadJSON(path) { return fetch(path).then(function (r) { return r.json(); }); }
 
   window.Shuk = {
@@ -235,6 +263,8 @@
     getCode: getCode, getUser: getUser, login: login, logout: logout,
     enqueue: enqueue, flush: flush, queueList: queueList, onQueueChange: onQueueChange, dropQueued: dropQueued,
     lastError: function () { return lastError; },
+    STREET_AREA: STREET_AREA, AREAS: AREAS, CENTER: CFG.CENTER || [32.0678, 34.7678],
+    placeLabel: placeLabel, distM: distM, baseLayers: baseLayers,
     gps: gps, resizeImage: resizeImage, uid: uid, cmpHouse: cmpHouse, esc: esc, loadJSON: loadJSON
   };
 })();

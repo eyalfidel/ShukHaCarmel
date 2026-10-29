@@ -1,4 +1,4 @@
-/* מפה + ייצוא. */
+/* מפה, סימון צמתים, ייצוא. */
 (function () {
   'use strict';
   var S = window.Shuk;
@@ -6,8 +6,8 @@
   var MAIN_STREET = 'הכרמל';
   var COLORS = { none: '#9aa0a6', ok: '#2f7d4f', warn: '#c27a12', junction: '#2b6cb0' };
 
-  var addresses = [], junctionsCalc = [], data = { businesses: [], junctions: [] };
-  var map, layer;
+  var addresses = [], data = { businesses: [], junctions: [] };
+  var map, layer, marking = false;
 
   function key(street, house) { return street + '|' + house; }
 
@@ -25,22 +25,22 @@
     $('loginView').classList.add('hidden');
     $('topBar').classList.remove('hidden'); $('mapWrap').classList.remove('hidden');
     if (!map) {
-      map = L.map('map', { zoomControl: true }).setView([32.0678, 34.7678], 18);
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 20, maxNativeZoom: 16, attribution: 'Esri'
-      }).addTo(map);
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 20, maxNativeZoom: 16
-      }).addTo(map);
+      map = L.map('map', { zoomControl: true, maxZoom: 21 }).setView(S.CENTER, 18);
+      S.baseLayers(map);
       layer = L.layerGroup().addTo(map);
+      map.on('click', function (e) { if (marking) junctionForm(e.latlng); });
     }
     load();
   }
 
   function load() {
     return Promise.all([
-      addresses.length ? null : S.loadJSON('data/addresses.json').then(function (a) { addresses = a; }),
-      junctionsCalc.length ? null : S.loadJSON('data/junctions.json').then(function (j) { junctionsCalc = j; }),
+      addresses.length ? null : S.loadJSON('data/addresses.json').then(function (a) {
+        addresses = a;
+        var streets = {};
+        a.forEach(function (x) { streets[x.street] = 1; });
+        $('streetList').innerHTML = Object.keys(streets).sort().map(function (n) { return '<option value="' + S.esc(n) + '">'; }).join('');
+      }),
       S.apiGet({ code: S.getCode() }).then(function (j) { data = { businesses: j.businesses || [], junctions: j.junctions || [] }; })
     ]).then(function () { fillFilters(); render(); }, function (e) {
       if (e.auth) { S.logout(); showLogin(); } else alert('שגיאה בטעינה: ' + e.message);
@@ -81,7 +81,9 @@
     var anyFilter = $('fType').value || $('fLinked').value || $('fStructure').value;
     var biz = filtered();
     var byAddr = {};
-    biz.forEach(function (b) { (byAddr[key(b.street, String(b.house))] = byAddr[key(b.street, String(b.house))] || []).push(b); });
+    biz.forEach(function (b) {
+      if (b.street) (byAddr[key(b.street, String(b.house))] = byAddr[key(b.street, String(b.house))] || []).push(b);
+    });
     var addrIndex = {};
     addresses.forEach(function (a) { addrIndex[key(a.street, a.house)] = a; });
 
@@ -101,30 +103,60 @@
     });
     if (!map._fitted && bounds.length) { map.fitBounds(bounds, { padding: [20, 20] }); map._fitted = true; }
 
-    // צמתים: שאושרו בשטח (מלא) / מחושבים בלבד (ריק)
-    var confirmed = {};
-    data.junctions.forEach(function (j) { confirmed[j.cross_street] = j; });
-    junctionsCalc.forEach(function (j) {
-      var ok = confirmed[j.cross_street];
-      L.circleMarker([j.lat, j.lng], { radius: 7, color: COLORS.junction, weight: 2, fillColor: COLORS.junction, fillOpacity: ok ? .9 : 0 })
-        .bindTooltip('צומת ' + S.esc(j.cross_street) + (ok ? '' : ' (לא אושר)'), { direction: 'top' }).addTo(layer);
+    // עסקים באזורים בלי כתובת (השוק המערבי, שוק הבשר...) - לפי הנקודה שסומנה
+    var byPoint = {};
+    biz.forEach(function (b) {
+      if (b.street || !b.loc_lat) return;
+      var k = (+b.loc_lat).toFixed(5) + ',' + (+b.loc_lng).toFixed(5);
+      (byPoint[k] = byPoint[k] || []).push(b);
     });
+    Object.keys(byPoint).forEach(function (k) {
+      var list = byPoint[k], ll = k.split(',').map(Number);
+      var color = list.some(function (b) { return b.status === 'closed'; }) ? COLORS.warn : COLORS.ok;
+      L.marker(ll, { icon: L.divIcon({ className: '', iconSize: [14, 14],
+        html: '<div style="width:14px;height:14px;border-radius:3px;border:1.5px solid #fff;background:' + color + '"></div>' }) })
+        .bindTooltip(S.esc(S.placeLabel(list[0])), { direction: 'top' })
+        .bindPopup('<b>' + S.esc(list[0].area || '') + '</b><ul>' + list.map(function (b) {
+          return '<li>' + (b.stall ? S.esc(b.stall) + ': ' : '') + bizLine(b) + '</li>';
+        }).join('') + '</ul>')
+        .addTo(layer);
+    });
+
+    // צמתים שסומנו
     data.junctions.forEach(function (j) {
-      if (junctionsCalc.some(function (c) { return c.cross_street === j.cross_street; })) return;
       var lat = +j.lat, lng = +j.lng;
       if (!lat || !lng) return;
-      L.circleMarker([lat, lng], { radius: 7, color: COLORS.junction, weight: 2, fillColor: COLORS.junction, fillOpacity: .9 })
-        .bindTooltip('צומת ' + S.esc(j.cross_street) + ' (ידני)', { direction: 'top' }).addTo(layer);
+      var m = L.circleMarker([lat, lng], { radius: 8, color: '#fff', weight: 2, fillColor: COLORS.junction, fillOpacity: .95 })
+        .bindTooltip('צומת ' + S.esc(j.cross_street), { direction: 'top', permanent: true, className: 'jlabel' });
+      var pop = document.createElement('div');
+      pop.innerHTML = '<b>' + S.esc((j.street ? j.street + ' / ' : '') + j.cross_street) + '</b>' +
+        (j.note ? '<br>' + S.esc(j.note) : '') + '<br><span class="muted">' + S.esc(j.created_by || '') + '</span>' +
+        '<div class="actions"><button class="btn ghost small">מחיקת הצומת</button></div>';
+      pop.querySelector('button').onclick = function () {
+        if (!confirm('למחוק את הצומת ' + j.cross_street + '?')) return;
+        S.apiPost({ action: 'deleteJunction', id: j.id, code: S.getCode() }).then(function () {
+          data.junctions = data.junctions.filter(function (x) { return x !== j; });
+          map.closePopup(); render();
+        }, function (e) { alert(e.message); });
+      };
+      m.bindPopup(pop).addTo(layer);
     });
 
     // טבלה צדדית
+    biz.forEach(function (b) {
+      if (b.street) return;
+      var k = (b.area || '') + '|' + (b.stall || '');
+      (byAddr[k] = byAddr[k] || []).push(b);
+    });
     var keys = Object.keys(byAddr).sort(function (x, y) {
       var a = x.split('|'), b = y.split('|');
       return (a[0] !== MAIN_STREET) - (b[0] !== MAIN_STREET) || a[0].localeCompare(b[0], 'he') || S.cmpHouse(a[1], b[1]);
     });
     $('addrTable').innerHTML = keys.length ? '<table class="biz">' + keys.map(function (k) {
-      var p = k.split('|'), a = addrIndex[k];
-      return '<tr><th' + (a ? ' data-ll="' + a.lat + ',' + a.lng + '" style="cursor:pointer;text-decoration:underline"' : '') + '>' + S.esc(p[0] + ' ' + p[1]) + '</th><td>' +
+      var p = k.split('|'), a = addrIndex[k], first = byAddr[k][0];
+      var ll = a ? a.lat + ',' + a.lng : (!first.street && first.loc_lat ? first.loc_lat + ',' + first.loc_lng : '');
+      return '<tr><th' + (ll ? ' data-ll="' + ll + '" style="cursor:pointer;text-decoration:underline"' : '') + '>' +
+        S.esc(first.street ? p[0] + ' ' + p[1] : S.placeLabel(first)) + '</th><td>' +
         byAddr[k].map(bizLine).join('<br>') + '</td></tr>';
     }).join('') + '</table>' : '<p class="muted">אין דיווחים' + (anyFilter ? ' שמתאימים לסינון' : '') + '.</p>';
     $('addrTable').querySelectorAll('[data-ll]').forEach(function (th) {
@@ -140,10 +172,49 @@
     $('stats').textContent = filledN + ' עסקים · ' + closedN + ' להשלים · ' + carmelDone + '/' + carmelAll + ' כתובות בכרמל';
   }
 
+  // ---------- סימון צמתים ----------
+
+  $('markBtn').onclick = function () {
+    marking = !marking;
+    $('markBtn').textContent = marking ? 'סיום סימון' : 'סימון צמתים';
+    $('markBtn').classList.toggle('primary', marking);
+    $('markHelp').classList.toggle('hidden', !marking);
+    document.body.classList.toggle('mark-on', marking);
+    if (marking && map.getZoom() < 18) map.setZoom(18);
+  };
+
+  function junctionForm(latlng) {
+    var box = document.createElement('div');
+    box.className = 'jform';
+    box.innerHTML = '<b>צומת חדש</b>' +
+      '<input type="text" class="js" list="streetList" value="' + MAIN_STREET + '" placeholder="רחוב ראשי">' +
+      '<input type="text" class="jc" list="streetList" placeholder="רחוב חוצה / סמטה">' +
+      '<input type="text" class="jn" placeholder="הערה (לא חובה)">' +
+      '<div class="actions"><button class="btn primary small">שמירה</button></div><div class="err"></div>';
+    var popup = L.popup({ minWidth: 220 }).setLatLng(latlng).setContent(box).openOn(map);
+    setTimeout(function () { box.querySelector('.jc').focus(); }, 50);
+    box.querySelector('button').onclick = function () {
+      var rec = {
+        street: box.querySelector('.js').value.trim(),
+        cross_street: box.querySelector('.jc').value.trim(),
+        note: box.querySelector('.jn').value.trim(),
+        lat: +latlng.lat.toFixed(6), lng: +latlng.lng.toFixed(6),
+        client_id: S.uid()
+      };
+      if (!rec.cross_street) { box.querySelector('.err').textContent = 'חסר שם רחוב חוצה'; return; }
+      this.disabled = true;
+      S.apiPost({ action: 'addJunction', junction: rec, code: S.getCode() }).then(function (r) {
+        data.junctions.push(Object.assign({ id: r.id, created_by: S.getUser() }, rec));
+        map.closePopup(popup); render();
+      }, function (e) { box.querySelector('.err').textContent = e.message; box.querySelector('button').disabled = false; });
+    };
+  }
+
   // ---------- ייצוא ----------
 
   var BIZ_COLS = [
-    ['street', 'רחוב'], ['house', 'מספר'], ['side', 'צד'], ['status', 'סטטוס'],
+    ['area', 'אזור'], ['street', 'רחוב'], ['house', 'מספר'], ['side', 'צד'], ['stall', 'תיאור מיקום / דוכן'],
+    ['loc_lat', 'מיקום lat'], ['loc_lng', 'מיקום lng'], ['status', 'סטטוס'],
     ['structure', 'סוג המבנה'], ['business_name', 'שם העסק'], ['business_type', 'סוג העסק'],
     ['first_name', 'שם פרטי'], ['last_name', 'שם משפחה'], ['phone', 'טלפון'], ['tenure', 'שוכר/בעלים'],
     ['linked_to', 'מקושר ל-'], ['note', 'הערה'], ['photo_url', 'תמונה'],
@@ -152,8 +223,7 @@
     ['created_by', 'מילא/ה'], ['created_at', 'נוצר'], ['updated_by', 'עודכן ע"י'], ['updated_at', 'עודכן'],
     ['id', 'מזהה'], ['visit_id', 'מזהה ביקור']
   ];
-  var J_COLS = [['street', 'רחוב'], ['cross_street', 'רחוב חוצה'], ['side', 'צד'], ['between_from', 'בין מספר'],
-    ['between_to', 'לבין מספר'], ['note', 'הערה'], ['lat', 'lat'], ['lng', 'lng'], ['created_by', 'מילא/ה'], ['created_at', 'נוצר']];
+  var J_COLS = [['street', 'רחוב'], ['cross_street', 'רחוב חוצה'], ['note', 'הערה'], ['lat', 'lat'], ['lng', 'lng'], ['created_by', 'מילא/ה'], ['created_at', 'נוצר']];
 
   function sheet(rows, cols) {
     return XLSX.utils.aoa_to_sheet([cols.map(function (c) { return c[1]; })].concat(rows.map(function (r) {
@@ -167,7 +237,9 @@
 
   function sortedBiz() {
     return filtered().slice().sort(function (x, y) {
-      return (x.street !== MAIN_STREET) - (y.street !== MAIN_STREET) || String(x.street).localeCompare(y.street, 'he') ||
+      return String(x.area || '').localeCompare(y.area || '', 'he') ||
+        (x.street !== MAIN_STREET) - (y.street !== MAIN_STREET) || String(x.street).localeCompare(y.street, 'he') ||
+        String(x.stall || '').localeCompare(y.stall || '', 'he') ||
         S.cmpHouse(String(x.house), String(y.house));
     });
   }

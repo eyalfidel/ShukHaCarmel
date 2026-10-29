@@ -31,6 +31,7 @@
       <span><i class="dot" style="background:var(--ok)"></i>מולא</span>
       <span><i class="dot" style="background:var(--warn)"></i>יש להשלים</span>
       <span><i class="dot" style="background:#2b6cb0"></i>צומת</span>
+      <span><i class="dot" style="background:var(--ok);border-radius:2px"></i>עסק באזור בלי כתובת</span>
     </div>
     <label class="f" for="fType">סוג עסק</label>
     <select id="fType"><option value="">הכול</option></select>
@@ -38,6 +39,10 @@
     <select id="fLinked"><option value="">הכול</option></select>
     <label class="f" for="fStructure">סוג מבנה</label>
     <select id="fStructure"><option value="">הכול</option></select>
+    <div class="actions">
+      <button id="markBtn" class="btn small">סימון צמתים</button>
+    </div>
+    <p id="markHelp" class="muted hidden">מצב סימון: לחיצה על המפה במקום הצומת פותחת חלון להזנת שם הרחוב החוצה. לחיצה על צומת קיים מאפשרת למחוק אותו.</p>
     <div class="actions">
       <button id="xlsxBtn" class="btn primary small">ייצוא לאקסל</button>
       <button id="jsonBtn" class="btn ghost small">ייצוא JSON</button>
@@ -48,6 +53,7 @@
   </aside>
 </div>
 
+<datalist id="streetList"></datalist>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js"></script>
