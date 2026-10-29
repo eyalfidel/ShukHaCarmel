@@ -201,6 +201,7 @@
     $('card').classList.remove('hidden');
     document.body.classList.add('card-open');
     $('cardClose').onclick = closeCard;
+    renderQuickEdit(b);
 
     var box = $('cardPhoto');
     if (!b.photo_url) { box.innerHTML = '<p class="muted">אין תמונה</p>'; return; }
@@ -219,6 +220,36 @@
         : '<p class="muted">התמונה לא נטענה</p>';
     });
   }
+  // עדכון מהיר מהכרטיס: שוכר/בעלים והערה. עריכה מלאה - בטופס
+  function renderQuickEdit(b) {
+    var box = document.createElement('div');
+    box.className = 'quick-edit';
+    box.innerHTML = '<h4>עדכון</h4><label class="f">שוכר או בעלים</label><div class="chips">' +
+      S.TENURES.map(function (t) {
+        return '<label><input type="radio" name="qtenure" value="' + S.esc(t) + '"' + (b.tenure === t ? ' checked' : '') + '>' + S.esc(t) + '</label>';
+      }).join('') + '</div>' +
+      '<label class="f">הערה</label><textarea class="qnote">' + S.esc(b.note || '') + '</textarea>' +
+      '<div class="actions"><button class="btn primary small qsave">שמירת עדכון</button>' +
+      '<a class="btn ghost small" href="index.html#edit=' + encodeURIComponent(b.id) + '">עריכה מלאה בטופס</a></div>' +
+      '<div class="qmsg muted"></div>';
+    $('card').appendChild(box);
+    box.querySelector('.qsave').onclick = function () {
+      var btn = this, r = box.querySelector('input[name=qtenure]:checked');
+      var upd = { note: box.querySelector('.qnote').value.trim() };
+      if (r) upd.tenure = r.value;
+      btn.disabled = true; box.querySelector('.qmsg').textContent = 'שומר…';
+      S.apiPost({ action: 'updateBusiness', id: b.id, business: upd, code: S.getCode() }).then(function (res) {
+        if (res && res.ok === false) throw new Error(res.error);
+        Object.assign(b, upd, { updated_by: S.getUser(), updated_at: new Date().toISOString() });
+        render(); openCard(b);
+        $('card').querySelector('.qmsg').textContent = 'נשמר ✓';
+      }).catch(function (e) {
+        box.querySelector('.qmsg').textContent = 'לא נשמר: ' + e.message;
+        btn.disabled = false;
+      });
+    };
+  }
+
   function closeCard() { $('card').classList.add('hidden'); document.body.classList.remove('card-open'); }
   function fmtDate(v) {
     if (!v) return '';

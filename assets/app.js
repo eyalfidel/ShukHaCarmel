@@ -93,6 +93,7 @@
       $('settingsLink').classList.toggle('hidden', !S.isAdmin());
       if (state.mode) applySettings();
       renderLinkedList(); renderPending(); renderExisting();
+      openFromHash();
     }, function (e) {
       if (e.auth) { S.logout(); showLogin(); }
       // בלי רשת - ממשיכים עם מה שיש
@@ -281,7 +282,7 @@
     state.mode = mode;
     state.editing = mode === 'complete' ? preset : null;
     form.dataset.mode = formKey();
-    $('formTitle').textContent = TITLES[mode];
+    $('formTitle').textContent = mode === 'complete' && preset.status !== 'closed' ? 'עריכת עסק' : TITLES[mode];
     TEXT_FIELDS.forEach(function (k) { field(k).value = preset[k] != null ? preset[k] : ''; });
     RADIO_FIELDS.forEach(function (k) { setRadio(k, preset[k] || ''); });
     $('f_gallery').value = ''; $('f_capture').value = ''; setPhoto(null);
@@ -335,7 +336,7 @@
       rec[k] = RADIO_FIELDS.indexOf(k) >= 0 ? getRadio(k) : field(k).value.trim();
       if (m === 'req' && !rec[k]) errs.push({ key: k, msg: 'חסר: ' + f.label });
     });
-    if (modeOf('photo') === 'req' && !photoFile) errs.push({ key: 'photo', msg: 'חסרה תמונה' });
+    if (modeOf('photo') === 'req' && !photoFile && !(state.editing && state.editing.photo_url)) errs.push({ key: 'photo', msg: 'חסרה תמונה' });
     if (rec.phone && !/^[0-9+\-\s()]{7,}$/.test(rec.phone)) errs.push({ key: 'phone', msg: 'מספר הטלפון לא תקין' });
     rec.side = sideOf(rec.house || '');
     // סדר השגיאות לפי סדר השדות בטופס
@@ -374,10 +375,13 @@
       var label = placeLabel(rec) + (rec.business_name ? ' - ' + rec.business_name : '');
 
       if (editing) {
-        return S.enqueue({ action: 'updateBusiness', id: editing.id, business: rec }, 'השלמה: ' + label).then(function () {
+        // עדכון לא דורס את ה-GPS של הדיווח המקורי
+        Object.keys(gpsFields()).forEach(function (k) { delete rec[k]; });
+        var wasEmpty = editing.status === 'closed';
+        return S.enqueue({ action: 'updateBusiness', id: editing.id, business: rec }, (wasEmpty ? 'השלמה: ' : 'עדכון: ') + label).then(function () {
           Object.assign(editing, rec, { photo: undefined });
-          toast('ההשלמה נשמרה');
-          closeForm(); renderPending(); showTab('pending');
+          toast(wasEmpty ? 'ההשלמה נשמרה' : 'העדכון נשמר');
+          closeForm(); renderPending(); showTab(wasEmpty ? 'pending' : 'report');
         });
       }
 
@@ -423,6 +427,17 @@
     });
   }
   $('refreshBtn').onclick = function () { refresh().then(function () { toast('עודכן'); }); };
+
+  // ---------- עריכה מתוך המפה: index.html#edit=<id> ----------
+
+  function openFromHash() {
+    var m = /^#edit=(.+)$/.exec(location.hash);
+    if (!m) return;
+    history.replaceState(null, '', location.pathname);
+    var b = state.server.businesses.filter(function (x) { return x.id === decodeURIComponent(m[1]); })[0];
+    if (b) openForm('complete', b); else toast('העסק לא נמצא');
+  }
+  window.addEventListener('hashchange', function () { if (S.getCode()) refresh(); });
 
   // ---------- טעינה ----------
 
