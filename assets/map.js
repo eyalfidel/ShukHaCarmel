@@ -58,14 +58,15 @@
     opts($('fType'), S.BUSINESS_TYPES);
     opts($('fLinked'), Object.keys(linked).sort());
     opts($('fStructure'), S.STRUCTURES);
+    opts($('fTenure'), S.TENURES);
   }
-  ['fType', 'fLinked', 'fStructure'].forEach(function (id) { $(id).onchange = render; });
+  ['fType', 'fLinked', 'fStructure', 'fTenure'].forEach(function (id) { $(id).onchange = render; });
   $('reloadBtn').onclick = load;
 
   function filtered() {
-    var t = $('fType').value, l = $('fLinked').value, st = $('fStructure').value;
+    var t = $('fType').value, l = $('fLinked').value, st = $('fStructure').value, tn = $('fTenure').value;
     return data.businesses.filter(function (b) {
-      return (!t || b.business_type === t) && (!l || b.linked_to === l) && (!st || b.structure === st);
+      return (!t || b.business_type === t) && (!l || b.linked_to === l) && (!st || b.structure === st) && (!tn || b.tenure === tn);
     });
   }
 
@@ -91,7 +92,7 @@
 
   function render() {
     layer.clearLayers();
-    var anyFilter = $('fType').value || $('fLinked').value || $('fStructure').value;
+    var anyFilter = $('fType').value || $('fLinked').value || $('fStructure').value || $('fTenure').value;
     var biz = filtered();
     var addrIndex = {};
     addresses.forEach(function (a) { addrIndex[key(a.street, a.house)] = a; });

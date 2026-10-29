@@ -8,7 +8,7 @@
 
   var BUSINESS_TYPES = ['הסעדה', 'מזון', 'מסחר', 'אחר'];
   var STRUCTURES = ['בסטה', 'חנות'];
-  var TENURES = ['שוכר', 'בעלים'];
+  var TENURES = ['שוכר', 'בעלים', 'לא יודע כרגע'];
   var STATUS_LABEL = { filled: 'מולא', closed: 'ריק – להשלים' };
 
   // שדות הטופס לפי הסדר, וברירת המחדל לכל סוג טופס:
@@ -16,19 +16,19 @@
   var FORMS = { full: 'עסק חדש', empty: 'עסק ריק' };
   var FIELDS = [
     { key: 'structure', label: 'בסטה או חנות', full: 'req', empty: 'req' },
-    { key: 'first_name', label: 'שם פרטי', full: 'opt', empty: 'hide' },
-    { key: 'last_name', label: 'שם משפחה', full: 'opt', empty: 'hide' },
-    { key: 'phone', label: 'טלפון', full: 'opt', empty: 'hide' },
-    { key: 'business_name', label: 'שם העסק', full: 'opt', empty: 'opt' },
-    { key: 'business_type', label: 'סוג העסק', full: 'opt', empty: 'opt' },
+    { key: 'first_name', label: 'שם פרטי', full: 'req', empty: 'hide' },
+    { key: 'last_name', label: 'שם משפחה', full: 'req', empty: 'hide' },
+    { key: 'phone', label: 'טלפון', full: 'req', empty: 'hide' },
+    { key: 'business_name', label: 'שם העסק', full: 'req', empty: 'opt' },
+    { key: 'business_type', label: 'סוג העסק', full: 'req', empty: 'opt' },
     { key: 'business_type_other', label: 'פירוט סוג "אחר"', full: 'req', empty: 'opt', note: 'מופיע ונבדק רק כשנבחר "אחר"' },
-    { key: 'tenure', label: 'שוכר או בעלים', full: 'opt', empty: 'hide' },
+    { key: 'tenure', label: 'שוכר או בעלים', full: 'req', empty: 'hide' },
     { key: 'street', label: 'רחוב', full: 'req', empty: 'req' },
-    { key: 'house', label: 'מספר', full: 'opt', empty: 'opt' },
+    { key: 'house', label: 'מספר', full: 'req', empty: 'req' },
     { key: 'stall', label: 'תיאור מיקום', full: 'opt', empty: 'opt' },
     { key: 'linked_to', label: 'מקושר ל-', full: 'opt', empty: 'hide' },
     { key: 'note', label: 'הערה', full: 'opt', empty: 'opt' },
-    { key: 'photo', label: 'תמונה', full: 'opt', empty: 'opt' }
+    { key: 'photo', label: 'תמונה', full: 'req', empty: 'req' }
   ];
   var MODES = { req: 'חובה', opt: 'רשות', hide: 'לא מוצג' };
   var SETTINGS_KEY = 'shuk.settings';
