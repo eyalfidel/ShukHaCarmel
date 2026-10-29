@@ -206,7 +206,7 @@
   // ---------- תמונה: הקטנה לפני שליחה ----------
 
   function resizeImage(file, maxSide, quality) {
-    maxSide = maxSide || 1280; quality = quality || 0.75;
+    maxSide = maxSide || 2000; quality = quality || 0.8;
     return new Promise(function (resolve, reject) {
       var url = URL.createObjectURL(file);
       var img = new Image();
