@@ -9,6 +9,7 @@
 var SHEET_USERS = 'users';
 var SHEET_BUSINESSES = 'businesses';
 var SHEET_JUNCTIONS = 'junctions';
+var SHEET_SETTINGS = 'settings';
 var PHOTO_FOLDER_NAME = 'תמונות';
 // הגיליון. ריק = הגיליון שהסקריפט מחובר אליו (Extensions → Apps Script).
 var SPREADSHEET_ID = '1s67VqWINNlnxRNc-venxtaeFsSk-Yamh4Kxqj_KcbwY';
@@ -47,7 +48,8 @@ var BUSINESS_COLS = [
   ['created_at', 'נוצר'],
   ['updated_by', 'עודכן ע"י'],
   ['updated_at', 'עודכן'],
-  ['client_id', 'client_id']
+  ['client_id', 'client_id'],
+  ['business_type_other', 'פירוט סוג אחר']   // נוסף בסוף, כדי לא להזיז עמודות קיימות
 ];
 
 var JUNCTION_COLS = [
@@ -63,7 +65,7 @@ var JUNCTION_COLS = [
 ];
 
 // שדות שהלקוח רשאי לכתוב בעסק (השאר נקבעים בשרת)
-var BUSINESS_WRITABLE = ['street', 'house', 'side', 'area', 'stall', 'loc_lat', 'loc_lng', 'status', 'first_name', 'last_name', 'phone',
+var BUSINESS_WRITABLE = ['business_type_other', 'street', 'house', 'side', 'area', 'stall', 'loc_lat', 'loc_lng', 'status', 'first_name', 'last_name', 'phone',
   'business_name', 'business_type', 'structure', 'tenure', 'linked_to', 'note',
   'gps_open_lat', 'gps_open_lng', 'gps_open_acc', 'gps_close_lat', 'gps_close_lng', 'gps_close_acc'];
 
@@ -74,12 +76,12 @@ function ss_() {
 /** להריץ פעם אחת מתוך העורך: יוצר לשוניות, כותרות ותיקיית תמונות. */
 function setup() {
   var ss = ss_();
-  ensureSheet_(ss, SHEET_USERS, ['שם', 'קוד', 'פעיל']);
+  ensureSheet_(ss, SHEET_USERS, ['שם', 'קוד', 'פעיל', 'מנהל']);
   ensureSheet_(ss, SHEET_BUSINESSES, BUSINESS_COLS.map(function (c) { return c[1]; }));
   ensureSheet_(ss, SHEET_JUNCTIONS, JUNCTION_COLS.map(function (c) { return c[1]; }));
   var users = ss.getSheetByName(SHEET_USERS);
   if (users.getLastRow() < 2) {
-    users.appendRow(['אייל', randomCode_(), true]);
+    users.appendRow(['אייל', randomCode_(), true, true]);
   }
   photoFolder_();
   Logger.log('מוכן. הקוד הראשון נמצא בלשונית users.');
@@ -121,10 +123,13 @@ function doGet(e) {
   return handle_(function () {
     var p = e.parameter || {};
     var user = auth_(p.code);
-    if (p.action === 'ping') return { ok: true, user: user };
+    if (p.action === 'ping') return { ok: true, user: user, admin: isAdmin_(p.code) };
+    if (p.action === 'photo') return { ok: true, data: photoData_(p.id) };
     return {
       ok: true,
       user: user,
+      admin: isAdmin_(p.code),
+      settings: readSettings_(),
       businesses: readAll_(SHEET_BUSINESSES, BUSINESS_COLS),
       junctions: readAll_(SHEET_JUNCTIONS, JUNCTION_COLS)
     };
@@ -142,6 +147,7 @@ function doPost(e) {
       if (body.action === 'updateBusiness') return updateBusiness_(user, body);
       if (body.action === 'addJunction') return addJunction_(user, body);
       if (body.action === 'deleteJunction') return deleteJunction_(body);
+      if (body.action === 'saveSettings') return saveSettings_(body);
       throw new Error('פעולה לא מוכרת');
     } finally {
       lock.releaseLock();
@@ -168,6 +174,60 @@ function auth_(code) {
     if (String(rows[i][1]).trim() === code && active) return String(rows[i][0]);
   }
   throw new Error('AUTH');
+}
+
+// עמודה רביעית בלשונית users: "מנהל" (TRUE/FALSE)
+function isAdmin_(code) {
+  code = String(code || '').trim();
+  var rows = ss_().getSheetByName(SHEET_USERS).getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][1]).trim() !== code) continue;
+    var v = rows[i][3];
+    return v === true || String(v).toUpperCase() === 'TRUE';
+  }
+  return false;
+}
+
+// ---------- הגדרות הטופס (חובה / רשות / לא מוצג) ----------
+
+function settingsSheet_() {
+  var ss = ss_();
+  var sh = ss.getSheetByName(SHEET_SETTINGS);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_SETTINGS);
+    sh.getRange(1, 1).setValue('הגדרות הטופס (JSON) - נערך מעמוד ההגדרות באתר');
+  }
+  return sh;
+}
+
+function readSettings_() {
+  var sh = ss_().getSheetByName(SHEET_SETTINGS);
+  if (!sh) return null;
+  var v = String(sh.getRange(2, 1).getValue() || '');
+  if (!v) return null;
+  try { return JSON.parse(v); } catch (e) { return null; }
+}
+
+function saveSettings_(body) {
+  if (!isAdmin_(body.code)) throw new Error('רק מנהל יכול לשנות הגדרות');
+  var s = body.settings;
+  if (!s || typeof s !== 'object') throw new Error('הגדרות לא תקינות');
+  settingsSheet_().getRange(2, 1).setValue(JSON.stringify(s));
+  return { ok: true };
+}
+
+// ---------- תמונה (רק למי שיש קוד פעיל) ----------
+
+function photoData_(id) {
+  id = String(id || '');
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(id)) throw new Error('מזהה תמונה לא תקין');
+  var file = DriveApp.getFileById(id);
+  var folderId = photoFolder_().getId();
+  var parents = file.getParents(), ok = false;
+  while (parents.hasNext()) if (parents.next().getId() === folderId) ok = true;
+  if (!ok) throw new Error('התמונה לא בתיקיית התמונות');
+  var blob = file.getBlob();
+  return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
 }
 
 // ---------- פעולות ----------
