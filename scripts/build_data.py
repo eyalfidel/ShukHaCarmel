@@ -82,6 +82,12 @@ def main(kalpi_root, out_dir):
         # שורה לכל כתובת: קומפקטי, וגם נוח ל-diff
         fh.write('[\n' + ',\n'.join(json.dumps(a, ensure_ascii=False) for a in addresses) + '\n]\n')
 
+    # כל שמות הרחובות בעיר (להשלמה האוטומטית בטופס), בכתיב הרשמי של העירייה
+    streets = sorted({norm_street(f['properties']['street']) for f in feats if f['properties'].get('street')})
+    with open(os.path.join(out_dir, 'streets.json'), 'w', encoding='utf-8') as fh:
+        json.dump(streets, fh, ensure_ascii=False, separators=(',', ':'))
+    print('city streets:', len(streets))
+
     print('addresses:', len(addresses), '| on', MAIN_STREET + ':', len(carmel),
           '| streets:', len({a['street'] for a in addresses}))
 

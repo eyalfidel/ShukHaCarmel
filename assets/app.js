@@ -444,11 +444,16 @@
   // ---------- טעינה ----------
 
   S.loadJSON('data/addresses.json').then(function (rows) {
-    var streets = {};
-    rows.forEach(function (a) { state.addrIndex[a.street + '|' + a.house] = a; streets[a.street] = 1; });
-    $('streetList').innerHTML = Object.keys(streets).sort(function (a, b) {
-      return (a !== 'הכרמל') - (b !== 'הכרמל') || a.localeCompare(b, 'he');
-    }).map(function (s) { return '<option value="' + S.esc(s) + '">'; }).join('');
+    rows.forEach(function (a) { state.addrIndex[a.street + '|' + a.house] = a; });
+  });
+  // בחירת רחוב: חיפוש סלחני בכל רחובות העיר, רחובות השוק ראשונים, ותיקון לשם הרשמי
+  S.loadJSON('data/streets.json').then(function (names) {
+    var cfg = window.SHUK_CONFIG || {};
+    var matcher = new window.ShukStreets.Matcher(names, cfg.PRIORITY_STREETS, cfg.STREET_ALIASES);
+    window.ShukStreets.attach(field('street'), matcher, {
+      hintAfter: field('street').closest('.row2'),
+      onPick: function () { field('house').focus(); }
+    });
   });
   if (S.getCode()) showApp(); else showLogin();
 })();
