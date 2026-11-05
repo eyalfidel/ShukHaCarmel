@@ -12,12 +12,13 @@ import json
 import os
 import re
 import sys
+import zipfile
 
 ROVA_ZONES = {51, 52, 53, 54, 55}      # תתי-רובע של רובע 5 (lev ha'ir)
 MAIN_STREET = 'הכרמל'
-# סמטאות שאין להן כתובות בקובץ העירוני (2022). שאר הסמטאות מופיעות שם בלי "סמטת":
-# "בית השואבה", "אלוף בצלות", "פלונית", "אלמונית", "תחכמוני", "אלו מציאות"
-EXTRA_STREETS = ['סמטת הכרמל', 'סמטת שפ"ר']
+# רחובות בלי כתובות בקובץ העירוני, שצריך בכל זאת להציע בטופס (שם → קו מ-OSM). כרגע אין:
+# סמטת הכרמל, סמטת השוק וכו' נמצאות בקובץ - ר' street_name() למטה
+EXTRA_STREETS = []
 OSM_NAMES = {}
 # בנוסף לרובע 5: כל כתובת עד המרחק הזה ממרכז השוק (אלוף בצלות, פלונית וכו')
 MARKET_CENTER = (32.0678, 34.7678)
@@ -53,9 +54,22 @@ def in_polygon(x, y, rings):
     return point_in_ring(x, y, rings[0]) and not any(point_in_ring(x, y, r) for r in rings[1:])
 
 
+def street_name(p):
+    """שם הרחוב מתוך "כתובת מלאה" ולא מ-t_rechov: בקובץ העירוני רחוב וסמטה באותו שם
+    חולקים את t_rechov ונבדלים רק בקוד הרחוב ("הכרמל" קוד 9, "סמטת הכרמל" קוד 1123)."""
+    full = (p.get('t_ktovet_melea') or '').strip()
+    house = (p.get('t_bayit_veknisa') or '').strip()
+    if house and full.endswith(house):
+        name = full[:-len(house)].strip()
+        if name:
+            return norm_street(name)
+    return norm_street(p.get('t_rechov'))
+
+
 def main(kalpi_root, out_dir):
-    feats = json.load(open(os.path.join(kalpi_root, 'data/processed/addresses_with_kalpi.geojson'),
-                           encoding='utf-8'))['features']
+    # קובץ הכתובות העירוני המלא (שכבת "כתובות בתאי פיקוח", 2022)
+    with zipfile.ZipFile(os.path.join(kalpi_root, 'data/raw/tlv_addresses_full.zip')) as z:
+        feats = json.loads(z.read('tlv_addresses_full.geojson').decode('utf-8'))['features']
     zones = json.load(open(os.path.join(kalpi_root, 'data/raw/tlv_subdistricts.geojson'),
                            encoding='utf-8'))['features']
     polys = [z['geometry']['coordinates'] for z in zones if z['properties']['zone_num'] in ROVA_ZONES]
@@ -68,8 +82,8 @@ def main(kalpi_root, out_dir):
         if not near and not any(in_polygon(lng, lat, rings) for rings in polys):
             continue
         p = f['properties']
-        street = norm_street(p['street'])
-        house = re.sub(r'\s+', '', p.get('house_display') or '')
+        street = street_name(p)
+        house = re.sub(r'\s+', '', p.get('t_bayit_veknisa') or '')
         if not street or not house or (street, house) in seen:
             continue
         seen.add((street, house))
@@ -91,7 +105,7 @@ def main(kalpi_root, out_dir):
         fh.write('[\n' + ',\n'.join(json.dumps(a, ensure_ascii=False) for a in addresses) + '\n]\n')
 
     # כל שמות הרחובות בעיר (להשלמה האוטומטית בטופס), בכתיב הרשמי של העירייה
-    streets = {norm_street(f['properties']['street']) for f in feats if f['properties'].get('street')}
+    streets = {street_name(f['properties']) for f in feats if f['properties'].get('t_rechov')}
     # סמטאות בשוק שאין עליהן כתובות רשמיות, ולכן לא מופיעות ברשימת העירייה (השמות מ-OSM)
     streets |= set(EXTRA_STREETS)
     streets = sorted(streets)
