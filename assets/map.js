@@ -6,7 +6,7 @@
   var MAIN_STREET = 'הכרמל';
   var COLORS = { none: '#9aa0a6', ok: '#2f7d4f', warn: '#c27a12', junction: '#2b6cb0' };
 
-  var addresses = [], data = { businesses: [], junctions: [] };
+  var addresses = [], alleys = {}, byStreet = {}, data = { businesses: [], junctions: [] };
   var map, layer, marking = false;
 
   function key(street, house) { return street + '|' + house; }
@@ -38,9 +38,10 @@
       addresses.length ? null : S.loadJSON('data/addresses.json').then(function (a) {
         addresses = a;
         var streets = {};
-        a.forEach(function (x) { streets[x.street] = 1; });
+        a.forEach(function (x) { streets[x.street] = 1; (byStreet[x.street] = byStreet[x.street] || []).push(x); });
         $('streetList').innerHTML = Object.keys(streets).sort().map(function (n) { return '<option value="' + S.esc(n) + '">'; }).join('');
       }),
+      Object.keys(alleys).length ? null : S.loadJSON('data/alleys.json').then(function (j) { alleys = j; }, function () { }),
       S.apiGet({ code: S.getCode() }).then(function (j) { data = { businesses: j.businesses || [], junctions: j.junctions || [] }; })
     ]).then(function () { fillFilters(); render(); }, function (e) {
       if (e.auth) { S.logout(); showLogin(); } else alert('שגיאה בטעינה: ' + e.message);
@@ -82,12 +83,47 @@
     return S.esc(s);
   }
 
-  // מיקום עסק: נקודת הכתובת אם היא ברשימה, אחרת ה-GPS מפתיחת הטופס
+  // מיקום עסק, מהמדויק לפחות מדויק:
+  //   addr  - הכתובת ברשימת העירייה
+  //   near  - הרחוב ברשימה אבל המספר לא: המספר הקרוב באותו צד (תרמ"ב 40 → 38)
+  //   alley - סמטה בלי מספרים רשמיים: נקודת ה-GPS "נצמדת" לקו הסמטה
+  //   gps   - נקודת ה-GPS כמו שהיא
   function bizPoint(b, addrIndex) {
     var a = b.street && addrIndex[key(b.street, String(b.house))];
-    if (a) return { lat: a.lat, lng: a.lng, byAddr: true };
+    if (a) return { lat: a.lat, lng: a.lng, kind: 'addr' };
     var lat = +(b.gps_open_lat || b.gps_close_lat || b.loc_lat), lng = +(b.gps_open_lng || b.gps_close_lng || b.loc_lng);
-    return lat && lng ? { lat: lat, lng: lng, byAddr: false } : null;
+    var n = parseInt(b.house, 10), list = byStreet[b.street];
+    if (list && !isNaN(n)) {
+      var best = null;
+      list.forEach(function (x) {
+        var m = parseInt(x.house, 10);
+        if (isNaN(m) || m % 2 !== n % 2) return;
+        if (!best || Math.abs(m - n) < Math.abs(parseInt(best.house, 10) - n)) best = x;
+      });
+      if (best && Math.abs(parseInt(best.house, 10) - n) <= 10) return { lat: best.lat, lng: best.lng, kind: 'near', near: best.house };
+    }
+    if (alleys[b.street]) {
+      var p = lat && lng ? snapToLines(lat, lng, alleys[b.street]) : null;
+      if (p && p.d <= 120) return { lat: p.lat, lng: p.lng, kind: 'alley' };
+      var l = alleys[b.street][0], mid = l[Math.floor((l.length - 1) / 2)];
+      if (!(lat && lng)) return { lat: mid[0], lng: mid[1], kind: 'alley' };
+    }
+    return lat && lng ? { lat: lat, lng: lng, kind: 'gps' } : null;
+  }
+
+  // הנקודה הקרובה ביותר על קווי הרחוב (במטרים, קירוב שטוח)
+  function snapToLines(lat, lng, lines) {
+    var ky = 111320, kx = 111320 * Math.cos(lat * Math.PI / 180), best = null;
+    lines.forEach(function (line) {
+      for (var i = 0; i < line.length - 1; i++) {
+        var ax = line[i][1] * kx, ay = line[i][0] * ky, bx = line[i + 1][1] * kx, by = line[i + 1][0] * ky;
+        var px = lng * kx, py = lat * ky, vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy;
+        var t = L ? Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / L)) : 0;
+        var qx = ax + t * vx, qy = ay + t * vy, d = Math.hypot(px - qx, py - qy);
+        if (!best || d < best.d) best = { lat: qy / ky, lng: qx / kx, d: d };
+      }
+    });
+    return best;
   }
 
   function render() {
@@ -117,7 +153,7 @@
           lng += r * Math.sin(ang) / (111320 * Math.cos(lat * Math.PI / 180));
         }
         var color = b.status === 'closed' ? COLORS.warn : COLORS.ok;
-        var shape = b._pt.byAddr ? '50%' : '3px';
+        var shape = b._pt.kind === 'gps' ? '3px' : '50%';
         var m = L.marker([lat, lng], { icon: L.divIcon({ className: '', iconSize: [16, 16],
           html: '<div class="bizdot" style="border-radius:' + shape + ';background:' + color + '"></div>' }) });
         m.bindTooltip(bizLine(b), { direction: 'top' });
@@ -200,7 +236,11 @@
       '<table class="kv">' + rows.map(function (r) {
         return '<tr><th>' + r[0] + '</th><td>' + (r[2] ? r[1] : S.esc(r[1])) + '</td></tr>';
       }).join('') + '</table>' +
-      (b._pt && !b._pt.byAddr ? '<p class="muted small">ממוקם במפה לפי ה-GPS (הכתובת לא ברשימה)</p>' : '');
+      (b._pt && b._pt.kind !== 'addr' ? '<p class="muted small">' + ({
+        near: 'מיקום משוער: המספר לא ברשימת העירייה, מוצג ליד ' + S.esc(b.street) + ' ' + S.esc(b._pt.near),
+        alley: 'מיקום משוער: סמטה בלי מספרים רשמיים, נקודת ה-GPS הוצמדה לסמטה',
+        gps: 'ממוקם לפי ה-GPS (הכתובת לא ברשימה)'
+      })[b._pt.kind] + '</p>' : '');
     $('card').classList.remove('hidden');
     document.body.classList.add('card-open');
     $('cardClose').onclick = closeCard;

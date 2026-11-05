@@ -7,6 +7,7 @@
 
   var state = {
     addrIndex: {},         // 'רחוב|מספר' -> כתובת מ-data/addresses.json
+    streetsWithAddr: {},   // רחובות שיש להם כתובות ברשימה
     server: { businesses: [], junctions: [] },
     mode: null,            // 'full' | 'empty' | 'complete'
     editing: null,         // העסק שמשלימים (במצב complete)
@@ -202,7 +203,11 @@
     var street = field('street').value.trim(), house = field('house').value.trim();
     var side = sideOf(house), info = '';
     if (side) info = 'צד ' + side;
-    if (street && house && !state.addrIndex[street + '|' + house]) info += (info ? ' · ' : '') + 'הכתובת לא ברשימה - במפה תסומן לפי ה-GPS';
+    if (street && house && !state.addrIndex[street + '|' + house]) {
+      var known = state.streetsWithAddr[street];
+      info += (info ? ' · ' : '') + (known ? 'המספר לא ברשימת העירייה - במפה יוצג ליד המספר הקרוב'
+        : 'אין לרחוב מספרים ברשימת העירייה - במפה יוצג לפי ה-GPS');
+    }
     $('sideInfo').textContent = info;
     renderExisting();
   }
@@ -444,7 +449,7 @@
   // ---------- טעינה ----------
 
   S.loadJSON('data/addresses.json').then(function (rows) {
-    rows.forEach(function (a) { state.addrIndex[a.street + '|' + a.house] = a; });
+    rows.forEach(function (a) { state.addrIndex[a.street + '|' + a.house] = a; state.streetsWithAddr[a.street] = 1; });
   });
   // בחירת רחוב: חיפוש סלחני בכל רחובות העיר, רחובות השוק ראשונים, ותיקון לשם הרשמי
   S.loadJSON('data/streets.json').then(function (names) {

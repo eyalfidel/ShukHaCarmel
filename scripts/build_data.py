@@ -16,6 +16,8 @@ import sys
 ROVA_ZONES = {51, 52, 53, 54, 55}      # תתי-רובע של רובע 5 (lev ha'ir)
 MAIN_STREET = 'הכרמל'
 EXTRA_STREETS = ['סמטת הכרמל', 'סמטת אלו מציאות', 'סמטת בית השואבה', 'סמטת שפ"ר', 'סמטת תחכמוני']
+# השם ב-OSM כשהוא שונה מהשם אצלנו (שגיאת הקלדה ב-OSM)
+OSM_NAMES = {'סמטת תחכמוני': 'סםטת תחכמוני'}
 
 
 def norm_street(s):
@@ -91,6 +93,19 @@ def main(kalpi_root, out_dir):
     with open(os.path.join(out_dir, 'streets.json'), 'w', encoding='utf-8') as fh:
         json.dump(streets, fh, ensure_ascii=False, separators=(',', ':'))
     print('city streets:', len(streets))
+
+    # קווי הסמטאות מ-OSM: במפה, דיווח בסמטה "נצמד" לקו שלה במקום לנקודת ה-GPS הגולמית
+    roads = json.load(open(os.path.join(kalpi_root, 'data/osm_context_tlv/box_0.json'), encoding='utf-8'))['roads']
+    alleys = {}
+    for name in EXTRA_STREETS:
+        osm = OSM_NAMES.get(name, name)
+        lines = [[[round(c[i] / 1e5, 6), round(c[i + 1] / 1e5, 6)] for i in range(0, len(c) - 1, 2)]
+                 for _, n, c in roads if n == osm]
+        if lines:
+            alleys[name] = lines
+    with open(os.path.join(out_dir, 'alleys.json'), 'w', encoding='utf-8') as fh:
+        json.dump(alleys, fh, ensure_ascii=False, separators=(',', ':'))
+    print('alleys with geometry:', len(alleys))
 
     print('addresses:', len(addresses), '| on', MAIN_STREET + ':', len(carmel),
           '| streets:', len({a['street'] for a in addresses}))
