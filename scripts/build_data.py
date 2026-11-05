@@ -15,6 +15,7 @@ import sys
 
 ROVA_ZONES = {51, 52, 53, 54, 55}      # תתי-רובע של רובע 5 (lev ha'ir)
 MAIN_STREET = 'הכרמל'
+EXTRA_STREETS = ['סמטת הכרמל', 'סמטת אלו מציאות', 'סמטת בית השואבה', 'סמטת שפ"ר', 'סמטת תחכמוני']
 
 
 def norm_street(s):
@@ -83,7 +84,10 @@ def main(kalpi_root, out_dir):
         fh.write('[\n' + ',\n'.join(json.dumps(a, ensure_ascii=False) for a in addresses) + '\n]\n')
 
     # כל שמות הרחובות בעיר (להשלמה האוטומטית בטופס), בכתיב הרשמי של העירייה
-    streets = sorted({norm_street(f['properties']['street']) for f in feats if f['properties'].get('street')})
+    streets = {norm_street(f['properties']['street']) for f in feats if f['properties'].get('street')}
+    # סמטאות בשוק שאין עליהן כתובות רשמיות, ולכן לא מופיעות ברשימת העירייה (השמות מ-OSM)
+    streets |= set(EXTRA_STREETS)
+    streets = sorted(streets)
     with open(os.path.join(out_dir, 'streets.json'), 'w', encoding='utf-8') as fh:
         json.dump(streets, fh, ensure_ascii=False, separators=(',', ':'))
     print('city streets:', len(streets))

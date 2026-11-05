@@ -4,7 +4,8 @@
   'use strict';
 
   // מילים שלא משנות את זהות הרחוב
-  var STOP = ['רחוב', 'רח', 'שדרות', 'שדרת', 'שד', 'סמטת', 'סמטה', 'סמ', 'דרך', 'כיכר', 'ככר', 'מעבר',
+  // "סמטת" לא ברשימה: סמטת הכרמל הוא רחוב אחר מהכרמל
+  var STOP = ['רחוב', 'רח', 'שדרות', 'שדרת', 'שד', 'דרך', 'כיכר', 'ככר', 'מעבר',
     'הרב', 'הרבי', 'רבי', 'ר', 'רב', 'דר', 'דוקטור', 'פרופ', 'פרופסור', 'מר', 'גברת', 'המשורר', 'הסופר'];
   var FINALS = { 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' };
 
@@ -26,7 +27,8 @@
   function words(s) {
     return clean(s).split(' ').filter(function (t) { return t && STOP.indexOf(t) < 0; });
   }
-  function tokens(s) { return words(s).map(skel); }
+  var ABBR = { 'סמ': 'סמטת', 'סמטה': 'סמטת' };
+  function tokens(s) { return words(s).map(function (w) { return skel(ABBR[w] || w); }); }
   function lev(a, b, max) {
     if (Math.abs(a.length - b.length) > max) return max + 1;
     var prev = [], cur, i, j;

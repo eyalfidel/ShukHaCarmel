@@ -252,7 +252,7 @@ function submitVisit_(user, body) {
       'gps_close_lat', 'gps_close_lng', 'gps_close_acc'].forEach(function (k) {
       if (rec[k] === undefined || rec[k] === '') rec[k] = body[k];
     });
-    rec.id = Utilities.getUuid().slice(0, 8);
+    rec.id = newId_('b');
     rec.visit_id = visitId;
     rec.status = rec.status === 'closed' ? 'closed' : 'filled';
     rec.photo_url = b.photo ? savePhoto_(b.photo, rec) : '';
@@ -292,7 +292,7 @@ function addJunction_(user, body) {
   var existing = columnValues_(sh, JUNCTION_COLS, 'client_id');
   if (j.client_id && existing[j.client_id]) return { ok: true, id: existing[j.client_id] };
   var rec = pick_(j, ['street', 'cross_street', 'note', 'lat', 'lng']);
-  rec.id = Utilities.getUuid().slice(0, 8);
+  rec.id = newId_('j');
   rec.created_by = user;
   rec.created_at = new Date();
   rec.client_id = j.client_id || '';
@@ -329,6 +329,11 @@ function colIndex_(cols, key) {
   return -1;
 }
 
+// מזהה שמתחיל באות, כדי שהגיליון לא יהפוך אותו למספר (478e2602 → 4.78E+26)
+function newId_(prefix) {
+  return prefix + Utilities.getUuid().replace(/-/g, '').slice(0, 7);
+}
+
 function pick_(obj, keys) {
   var out = {};
   keys.forEach(function (k) { if (obj[k] !== undefined) out[k] = typeof obj[k] === 'string' ? obj[k].trim() : obj[k]; });
@@ -339,8 +344,9 @@ function toRow_(rec, cols) {
   return cols.map(function (c) {
     var v = rec[c[0]];
     if (v === undefined || v === null) return '';
-    // מניעת פרשנות של טקסט כנוסחה (=, +, -, @) ושמירה על אפס מוביל בטלפון
-    if (typeof v === 'string' && /^[=+\-@0]/.test(v)) return "'" + v;
+    // טקסט נשאר טקסט: בלי פרשנות כנוסחה (=, +, -, @), בלי איבוד אפס מוביל בטלפון,
+    // ובלי שמזהה או מספר בית יהפכו למספר/תאריך
+    if (typeof v === 'string' && /^[=+\-@0-9]/.test(v)) return "'" + v;
     return v;
   });
 }
