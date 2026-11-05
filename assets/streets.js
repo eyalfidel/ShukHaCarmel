@@ -28,6 +28,9 @@
     return clean(s).split(' ').filter(function (t) { return t && STOP.indexOf(t) < 0; });
   }
   var ABBR = { 'סמ': 'סמטת', 'סמטה': 'סמטת' };
+  // מילה "רכה": נספרת כשהיא בשם (סמטת הכרמל ≠ הכרמל), אבל לא חוסמת התאמה
+  // (סמטת בית השואבה → "בית השואבה", כי ככה הוא רשום בעירייה)
+  var SOFT = skel('סמטת');
   function tokens(s) { return words(s).map(function (w) { return skel(ABBR[w] || w); }); }
   function lev(a, b, max) {
     if (Math.abs(a.length - b.length) > max) return max + 1;
@@ -61,7 +64,7 @@
         else if (q.length >= 4 && n.length > q.length && lev(q, n.slice(0, q.length), 1) <= 1) s = 3;
         if (s > best) { best = s; bestJ = j; }
       }
-      if (!best) return 0;
+      if (!best) { if (q === SOFT) continue; return 0; }
       used[bestJ] = true; total += best;
     }
     // עדיפות לשם שכל מילותיו כוסו, ולשמות קצרים
@@ -112,6 +115,10 @@
       var raw = words(q).sort().join(' ');
       var exactSpelling = same.filter(function (e) { return words(e.name).sort().join(' ') === raw; });
       if (exactSpelling.length === 1) same = exactSpelling;
+    }
+    if (!same.length && qt.indexOf(SOFT) >= 0) {
+      var bare = qt.filter(function (t) { return t !== SOFT; }).sort().join(' ');
+      same = this.entries.filter(function (e) { return e.t.slice().sort().join(' ') === bare; });
     }
     if (same.length === 1 && !nearRival) return { name: same[0].name, sure: true };
     var top = this.search(q, 3, false);

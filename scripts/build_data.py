@@ -15,9 +15,13 @@ import sys
 
 ROVA_ZONES = {51, 52, 53, 54, 55}      # תתי-רובע של רובע 5 (lev ha'ir)
 MAIN_STREET = 'הכרמל'
-EXTRA_STREETS = ['סמטת הכרמל', 'סמטת אלו מציאות', 'סמטת בית השואבה', 'סמטת שפ"ר', 'סמטת תחכמוני']
-# השם ב-OSM כשהוא שונה מהשם אצלנו (שגיאת הקלדה ב-OSM)
-OSM_NAMES = {'סמטת תחכמוני': 'סםטת תחכמוני'}
+# סמטאות שאין להן כתובות בקובץ העירוני (2022). שאר הסמטאות מופיעות שם בלי "סמטת":
+# "בית השואבה", "אלוף בצלות", "פלונית", "אלמונית", "תחכמוני", "אלו מציאות"
+EXTRA_STREETS = ['סמטת הכרמל', 'סמטת שפ"ר']
+OSM_NAMES = {}
+# בנוסף לרובע 5: כל כתובת עד המרחק הזה ממרכז השוק (אלוף בצלות, פלונית וכו')
+MARKET_CENTER = (32.0678, 34.7678)
+MARKET_RADIUS_M = 1500
 
 
 def norm_street(s):
@@ -60,7 +64,8 @@ def main(kalpi_root, out_dir):
     addresses = []
     for f in feats:
         lng, lat = f['geometry']['coordinates'][:2]
-        if not any(in_polygon(lng, lat, rings) for rings in polys):
+        near = ((lat - MARKET_CENTER[0]) * 110900) ** 2 + ((lng - MARKET_CENTER[1]) * 94400) ** 2 <= MARKET_RADIUS_M ** 2
+        if not near and not any(in_polygon(lng, lat, rings) for rings in polys):
             continue
         p = f['properties']
         street = norm_street(p['street'])
